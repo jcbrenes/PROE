@@ -1,0 +1,30 @@
+ESTANDARD DE CODIGO PROE
+Esta es una guía de formato para el código en C++ del proyecto PROE.
+Se solicita seguir esta guía para tener código que sea leible y entendible por otros. Además esto hace el proyecto más sostenible en 
+el tiempo.
+
+Variables:
+- El nombre inicia con minúscula
+- Utilizar nombres descriptivos. No importa que sean largos. Ejm: contadorPulsosMotorDerecho
+- Si la variable nunca va a ser modificada en el código, se debe declarar como const. Esto ayuda al compilador a hacer el código 
+más eficiente. Ejm: const int velocidadRefDerecha
+- NO deben aparecer en el código constantes (números). Esos números se entienden en el momento pero se olvidan luego de 48 horas. Se 
+debe crear una variable al inicio del código tipo constante. 
+Ejm: if (contadorPulsosMotorDerecho > 100) => malo 
+     if (contadorPulsosMotorDerecho > velocidadRefDerecha) => bueno
+
+Funciones y clases:
+- El nombre inicia con mayúscula
+- Utilizar nombres descriptivos.
+- Poner una línea de comentario con la descripción de qué hace la función. Se pone debajo del nombre de la función.
+Ejm:
+void IncrementoContador {
+//Función que incrementa un contador con cada pulso del enconder. 
+  contadorPulsosMotorDerecho++
+}
+
+Otros:
+- Hacer los comentarios con // y no con /* */ , esto facilita la vida la hacer debug
+- Usar solamente tab para indentar. No usar espacios.
+- Utilizar siempre las llaves {} en if, for, while, etc. A pesar de que cuando se usa una sola línea esto funcione, se pueden tener 
+muchos errores por no usar las llaves.
