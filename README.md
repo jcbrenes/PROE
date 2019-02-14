@@ -13,4 +13,4 @@ Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
 
 Asistentes:
 Carlos Alonso Barrantes Jiménez carlosalonso.b.j@gmail.com
-Asistente Sebastián Barquero
+Sebastián Barquero Meléndez sebas.barque@gmail.co
