@@ -10,4 +10,7 @@ Los códigos computacionales, archivos CAD, diagramas eléctricos, esquemas de e
 
 Contacto: 
 Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
+
+Asistentes:
+Carlos Alonso Barrantes Jiménez carlosalonso.b.j@gmail.com
 Asistente Sebastián Barquero
