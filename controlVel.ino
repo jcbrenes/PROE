@@ -9,7 +9,7 @@
 #define BIN2  5
 
 const int tiempoMuestreo=100;
-const int correccionSegundosTiempoMuestreo=(60*1000)/tiempoMuestreo;
+const int conversionSegundosTiempoMuestreo=(60*1000)/tiempoMuestreo;
 const int pulsosPorRev=206;
 const int limiteSuperiorCicloTrabajo=255;
 const int limiteInferiorCicloTrabajo=0;
@@ -19,17 +19,14 @@ int contPulsosIzquierda=0;
 int vMD=100;//valor bin equivalente al duty cicle motor derecho
 int vMI=100;// valor bin equivalente al duty cicle motor izquierdo
 int tiempoActual=0;
-int velActualDerecha=0;
-int velActualIzquierda=0;
-const int velRequerida=150; //rpm
-int setPoint=100;
-float Kp=0.5;
-float Kd=0.6;
-float Ki=0.1;
-
-int conteoVelocidadActualDerecha=0;
-int errorMinIntegral=-4000;
-int errorMaxIntegral=4000;
+int velActualDerecha=0;  //dato en RPM
+int velActualIzquierda=0; //dato en RPM
+const int velRequerida=150; //unidades RPM
+const float Kp=0.5; //constante control proporcional
+const float Kd=0.6; //constante control derivativo
+const float Ki=0.1; //constante control integral
+const int errorMinIntegral=-4000;
+const int errorMaxIntegral=4000;
 
 void setup() {
   // put your setup code here, to run once:
@@ -39,36 +36,38 @@ void setup() {
   pinMode(PWMB, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
-  attachInterrupt(A0, PulsosRuedaDerecha, RISING);
+  attachInterrupt(A0, PulsosRuedaDerecha, RISING);  //conectado el contador C1 rueda derecha
   //attachInterrupt(A1, DC2, CHANGE);
-  attachInterrupt(A2, PulsosRuedaIzquierda, RISING);
+  attachInterrupt(A2, PulsosRuedaIzquierda, RISING); //conectado el contador C1 rueda izquierda
   //attachInterrupt(A3, IC2, CHANGE);
   Serial.begin(9600);
   tiempoActual=millis();
 }
 int ControlVelocidadDerecha(int command, int velRef, int velActual){
-  float pidTerm=0;
-  int error=0;
-  static int last_error=0;
-  static int sum_error=0;
-  error=abs(velRef)-abs(velActual);
-  pidTerm= (Kp*error)+Ki*sum_error+(Kd*(error-last_error));
-  sum_error+= error;
-  sum_error=constrain(sum_error,errorMinIntegral,errorMaxIntegral);
-  last_error=error;
-  return constrain(command + int (pidTerm),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
+  //Funcion para implementar el control PID de la velocidad de la rueda Derecha
+  float pidTermDer=0;
+  int errorDer=0;
+  static int errorAnteriorDer=0;
+  static int sumErrorDer=0;
+  errorDer=abs(velRef)-abs(velActual);
+  pidTermDer= (Kp*errorDer)+Ki*sumErrorDer+(Kd*(errorDer-errorAnteriorDer));
+  sumErrorDer+= errorDer;
+  sumErrorDer=constrain(sumErrorDer,errorMinIntegral,errorMaxIntegral);
+  errorAnteriorDer=errorDer;
+  return constrain(command + int (pidTermDer),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
 }
 int ControlVelocidadIzquierda(int command, int velRef, int velActual){
-  float pidTerm2=0;
-  int error2=0;
-  static int last_error2=0;
-  static int sum_error2=0;
-  error2=abs(velRef)-abs(velActual);
-  pidTerm2= (Kp*error2)+Ki*sum_error2+(Kd*(error2-last_error2));
-  sum_error2+= error2;
-  sum_error2=constrain(sum_error2,errorMinIntegral,errorMaxIntegral);
-  last_error2=error2;
-  return constrain(command + int (pidTerm2),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
+  //Funcion que permite implementar el control PID de la rueda izquierda
+  float pidTermIzq=0;
+  int errorIzq=0;
+  static int errorAnteriorIzq=0;
+  static int sumErrorIzq=0;
+  errorIzq=abs(velRef)-abs(velActual);
+  pidTermIzq= (Kp*errorIzq)+Ki*sumErrorIzq+(Kd*(errorIzq-errorAnteriorIzq));
+  sumErrorIzq+= errorIzq;
+  sumErrorIzq=constrain(sumErrorIzq,errorMinIntegral,errorMaxIntegral);
+  errorAnteriorIzq=errorIzq;
+  return constrain(command + int (pidTermIzq),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
 }
 
 
@@ -87,8 +86,8 @@ void Avanzar(){
 
 void Velocidad(){
   //Esta función calcula las rpm en cada una de las ruedas 
-    velActualDerecha=contPulsosDerecha*correccionSegundosTiempoMuestreo/pulsosPorRev;
-    velActualIzquierda=contPulsosIzquierda*correccionSegundosTiempoMuestreo/pulsosPorRev;
+    velActualDerecha=contPulsosDerecha*conversionSegundosTiempoMuestreo/pulsosPorRev; //conversión de pulsos/s a RPM
+    velActualIzquierda=contPulsosIzquierda*conversionSegundosTiempoMuestreo/pulsosPorRev;
     contPulsosDerecha=0;
     contPulsosIzquierda=0;
 }
