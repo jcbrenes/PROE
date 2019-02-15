@@ -7,10 +7,8 @@ int AIN2 = 12; //Direction
 int PWMB=9 ;
 int BIN1=6;
 int BIN2=5;
-int cDC1=0;
-bool cDC2=1;//motor invertido respecto al otro
-int cIC1=0;
-bool cIC2=0;
+int conteoDePulsosDerecha=0;
+int conteoDePulsosIzquierda=0;
 int vMD=100;//valor bin equivalente al duty cicle motor derecho
 int vMI=100;// valor bin equivalente al duty cicle motor izquierdo
 int tiempoActual=0;
@@ -20,9 +18,11 @@ const int velRef=500; //pulsos por segundo
 int error=0;
 int setPoint=100;
 int Kp=1;
-const int tiempoMuestreo=500;
+const int tiempoMuestreo=100;
+const int correccionSegundosDeTiempoMuestreo=10;
 const int limiteSuperiorCicloTrabajo=255;
 const int limiteInferiorCicloTrabajo=0;
+int conteoVelocidadActualDerecha=0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -32,16 +32,17 @@ void setup() {
   pinMode(PWMB, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
-  attachInterrupt(A0, DC1, RISING);
-  attachInterrupt(A1, DC2, CHANGE);
-  attachInterrupt(A2, IC1, RISING);
-  attachInterrupt(A3, IC2, CHANGE);
+  attachInterrupt(A0, ContarPulsosRuedaDerecha, RISING);
+  //attachInterrupt(A1, DC2, CHANGE);
+  attachInterrupt(A2, ContarPulsosRuedaIzquierda, RISING);
+  //attachInterrupt(A3, IC2, CHANGE);
   Serial.begin(9600);
   tiempoActual=millis();
 }
 
 
 void Avanzar(){
+  //Permite el avance del carro al poner las patillas correspondientes del puente H en alto
   digitalWrite(AIN1, LOW);
   digitalWrite(AIN2, HIGH);
   analogWrite(PWMA, vMI);
@@ -51,12 +52,12 @@ void Avanzar(){
   
 }
 void Velocidad(){
-  
+  //Esta función calcula los pulsos por segundo en cada una de las ruedas 
   if((millis()-tiempoActual)==tiempoMuestreo){
-    velDerecha=cDC1*2;
-    velIzquierda=cIC1*2;
-    cDC1=0;
-    cIC1=0;
+    velDerecha=conteoDePulsosDerecha*correccionSegundosDeTiempoMuestreo;
+    velIzquierda=conteoDePulsosIzquierda*correcionSegundosDeTiempoMuestreo;
+    conteoDePulsosDerecha=0;
+    conteoDePulsosIzquierda=0;
     tiempoActual=millis();
   }
 
@@ -79,26 +80,14 @@ void loop() {
 }
 
 
-void DC1(){
-  if(cDC2==1){
-    cDC1++; 
-  }
-  else{
-    cDC1--;
-  }
+void ContarPulsosRuedaDerecha(){
+  //Esta funcion lleva la cuenta de los pulsos del encoder C1 en la rueda derecha
+    conteoDePulsosDerecha++; //Utilicado para el cálculo de velocidad
 }
-void DC2(){
-cDC2=!cDC2;
+
+void ContarPulsosRuedaIzquierda(){
+  //Esta funcion lleva la cuenta de los pulsos del enconder C1 en la rueda izquierda
+    conteoDePulsosIzquierda++; //Utilizado para el cálculo de velocidad 
 }
-void IC1(){
-  if(cIC2==1){
-    cIC1++;
-  }
-  else{
-    cIC1--;
-  }
-}
-void IC2(){
-cIC2=!cIC2;
-}
+
 
