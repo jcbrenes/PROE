@@ -24,9 +24,12 @@ int velActualIzquierda=0;
 const int velRequerida=150; //rpm
 int setPoint=100;
 float Kp=0.5;
-float Kd=1;
+float Kd=0.6;
+float Ki=0.1;
 
 int conteoVelocidadActualDerecha=0;
+int errorMinIntegral=-4000;
+int errorMaxIntegral=4000;
 
 void setup() {
   // put your setup code here, to run once:
@@ -47,8 +50,11 @@ int ControlVelocidadDerecha(int command, int velRef, int velActual){
   float pidTerm=0;
   int error=0;
   static int last_error=0;
+  static int sum_error=0;
   error=abs(velRef)-abs(velActual);
-  pidTerm= (Kp*error)+(Kd*(error-last_error));
+  pidTerm= (Kp*error)+Ki*sum_error+(Kd*(error-last_error));
+  sum_error+= error;
+  sum_error=constrain(sum_error,errorMinIntegral,errorMaxIntegral);
   last_error=error;
   return constrain(command + int (pidTerm),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
 }
@@ -56,8 +62,11 @@ int ControlVelocidadIzquierda(int command, int velRef, int velActual){
   float pidTerm2=0;
   int error2=0;
   static int last_error2=0;
+  static int sum_error2=0;
   error2=abs(velRef)-abs(velActual);
-  pidTerm2= (Kp*error2)+(Kd*(error2-last_error2));
+  pidTerm2= (Kp*error2)+Ki*sum_error2+(Kd*(error2-last_error2));
+  sum_error2+= error2;
+  sum_error2=constrain(sum_error2,errorMinIntegral,errorMaxIntegral);
   last_error2=error2;
   return constrain(command + int (pidTerm2),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
 }
@@ -72,7 +81,7 @@ void Avanzar(){
   analogWrite(PWMA, vMI);
   digitalWrite(BIN1, LOW);
   digitalWrite(BIN2, HIGH); 
-  vMD=ControlVelocidadDerecha(vMD,velRequerida,velActualDerecha);
+  vMD=ControlVelocidadDerecha(vMD,velActualIzquierda,velActualDerecha);
   analogWrite(PWMB, vMD); 
 }
 
@@ -92,8 +101,8 @@ void loop() {
   }
   Serial.print("Velocidad rueda derecha=");
   Serial.print(velActualDerecha);
-  Serial.print("PWM= ");
-  Serial.println(vMD);
+  Serial.print(" Velocidad izquierda= ");
+  Serial.println(velActualIzquierda);
 }
 
 
