@@ -21,6 +21,7 @@ int contDistanciaIzq=0;
 int distLinealRuedaDerecha=0;
 int distLinealRuedaIzquierda=0;
 int desplazamientoLineal=0;
+
 int vMD=25;//valor bin equivalente al duty cicle motor derecho
 int vMI=25;// valor bin equivalente al duty cicle motor izquierdo
 int tiempoActual=0;
@@ -33,6 +34,7 @@ const float Ki=0.1; //constante control integral
 const int errorMinIntegral=-3000;
 const int errorMaxIntegral=3000;
 const float milimetrosPorPulso=0.671;
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -97,6 +99,7 @@ void Velocidad(){
     contPulsosDerecha=0;
     contPulsosIzquierda=0;
 }
+
 void Distancia(){
   distLinealRuedaDerecha=contDistanciaDer*milimetrosPorPulso;
   distLinealRuedaIzquierda=contDistanciaIzq*milimetrosPorPulso;
