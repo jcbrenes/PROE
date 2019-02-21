@@ -18,6 +18,10 @@ int contPulsosDerecha=0;
 int contPulsosIzquierda=0;
 int contDistanciaDer=0;
 int contDistanciaIzq=0;
+int distLinealRuedaDerecha=0;
+int distLinealRuedaIzquierda=0;
+int desplazamientoLineal=0;
+
 int vMD=25;//valor bin equivalente al duty cicle motor derecho
 int vMI=25;// valor bin equivalente al duty cicle motor izquierdo
 int tiempoActual=0;
@@ -29,7 +33,8 @@ const float Kd=0.8; //constante control derivativo
 const float Ki=0.1; //constante control integral
 const int errorMinIntegral=-3000;
 const int errorMaxIntegral=3000;
-const int pulsosMilimetro=1.4903;
+const float milimetrosPorPulso=0.671;
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -95,16 +100,23 @@ void Velocidad(){
     contPulsosIzquierda=0;
 }
 
+void Distancia(){
+  distLinealRuedaDerecha=contDistanciaDer*milimetrosPorPulso;
+  distLinealRuedaIzquierda=contDistanciaIzq*milimetrosPorPulso;
+  desplazamientoLineal=(distLinealRuedaDerecha+distLinealRuedaIzquierda)/2;
+}
+
 void loop() {
   if((millis()-tiempoActual)>=tiempoMuestreo){
     tiempoActual=millis();
     Velocidad();
+    Distancia();
     Avanzar();
   }
-  Serial.print("Velocidad rueda derecha=");
-  Serial.print(velActualDerecha);
-  Serial.print(" Velocidad izquierda= ");
-  Serial.println(velActualIzquierda);
+  Serial.print("Distancia rueda derecha=");
+  Serial.print(distLinealRuedaDerecha);
+  Serial.print(" Distancia rueda izquierda= ");
+  Serial.println(distLinealRuedaIzquierda);
 }
 
 
@@ -119,4 +131,5 @@ void PulsosRuedaIzquierda(){
     contPulsosIzquierda++; //Utilizado para el cálculo de velocidad 
     contDistanciaIzq++;
 }
+
 
