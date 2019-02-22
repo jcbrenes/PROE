@@ -21,20 +21,22 @@ int contDistanciaIzq=0;
 int distLinealRuedaDerecha=0;
 int distLinealRuedaIzquierda=0;
 int desplazamientoLineal=0;
-
-int vMD=25;//valor bin equivalente al duty cicle motor derecho
-int vMI=25;// valor bin equivalente al duty cicle motor izquierdo
+int vMD=25;//valor bin proporcional al duty cicle motor derecho
+int vMI=25;// valor bin proporcional al duty cicle motor izquierdo
 int tiempoActual=0;
 int velActualDerecha=0;  //dato en RPM
 int velActualIzquierda=0; //dato en RPM
+const int tiempoGiro=14;
 const int velRequerida=50; //unidades RPM
-const float Kp=0.4; //constante control proporcional
-const float Kd=0.8; //constante control derivativo
+const int velRequeridaGiro=20;
+const float Kp=1; //constante control proporcional
+const float Kd=0.5; //constante control derivativo
 const float Ki=0.1; //constante control integral
 const int errorMinIntegral=-3000;
 const int errorMaxIntegral=3000;
-const float milimetrosPorPulso=0.671;
-
+const float milimetrosPorPulso=0.6777184466; //avance lineal 139.5mm/rev dividido por 206 pulsos.
+bool giro=false;
+int contTemp=0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -91,6 +93,30 @@ void Avanzar(){
   vMD=ControlVelocidadDerecha(vMD,velRequerida,velActualDerecha);
   analogWrite(PWMB, vMD); 
 }
+void Giro(){
+  if(giro==true){
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, HIGH);
+    vMI=ControlVelocidadIzquierda(vMI,velRequeridaGiro,velActualIzquierda);
+    analogWrite(PWMA, vMI);
+    digitalWrite(BIN1, HIGH);
+    digitalWrite(BIN2, LOW); 
+    vMD=ControlVelocidadDerecha(vMD,velRequeridaGiro,velActualDerecha);
+    analogWrite(PWMB, vMD);
+  }
+}
+void Parar(){
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, LOW);
+    //vMI=ControlVelocidadIzquierda(vMI,velRequeridaGiro,velActualIzquierda);
+    analogWrite(PWMA, vMI);
+    digitalWrite(BIN1, LOW);
+    digitalWrite(BIN2, LOW); 
+    //vMD=ControlVelocidadDerecha(vMD,velRequeridaGiro,velActualDerecha);
+    analogWrite(PWMB, vMD);
+}
+  
+
 
 void Velocidad(){
   //Esta función calcula las rpm en cada una de las ruedas 
@@ -99,7 +125,6 @@ void Velocidad(){
     contPulsosDerecha=0;
     contPulsosIzquierda=0;
 }
-
 void Distancia(){
   distLinealRuedaDerecha=contDistanciaDer*milimetrosPorPulso;
   distLinealRuedaIzquierda=contDistanciaIzq*milimetrosPorPulso;
@@ -111,12 +136,19 @@ void loop() {
     tiempoActual=millis();
     Velocidad();
     Distancia();
-    Avanzar();
-  }
-  Serial.print("Distancia rueda derecha=");
-  Serial.print(distLinealRuedaDerecha);
-  Serial.print(" Distancia rueda izquierda= ");
-  Serial.println(distLinealRuedaIzquierda);
+//    Avanzar();
+   if(contTemp>=tiempoGiro){
+      contTemp=0;
+      giro=!giro;
+    }
+    if(giro==false){
+    Parar();
+    }
+    Giro();
+    contTemp++;
+    //Avanzar();
+    Serial.println(contTemp);
+  }  
 }
 
 
