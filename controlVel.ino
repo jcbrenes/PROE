@@ -302,4 +302,3 @@ void PulsosRuedaIzquierda(){
     contPulsosIzquierda++; //Utilizado para el cálculo de velocidad 
     contDistanciaIzq++;
 }
-
