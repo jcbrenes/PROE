@@ -5,55 +5,88 @@
 #define AIN1  11 //Direction
 #define AIN2  12
 #define PWMB  9
-#define BIN1  6
+#define BIN1  6 
 #define BIN2  5
 
-const int tiempoMuestreo=1;
-const int conversionSegundosTiempoMuestreo=(60*1000)/tiempoMuestreo;
-const int pulsosPorRev=206;
+const long tiempoMuestreo=5000;
+const float pulsosPorRev=206.0;
+const int factorEncoder=4;
 const int limiteSuperiorCicloTrabajo=255;
 const int limiteInferiorCicloTrabajo=0;
+const float avanceLineal=139.5;//139.5mm/rev
+const float conversionSegundosTiempoMuestreo=12000;
+const float pulsosPorMilimetro=(factorEncoder*pulsosPorRev)/avanceLineal; //avance lineal 139.5mm/rev dividido por 206*2 pulsos.
 
-int contPulsosDerecha=0;
-int contPulsosIzquierda=0;
-int contDistanciaDer=0;
-int contDistanciaIzq=0;
-float distLinealRuedaDerecha=0;
-float distLinealRuedaIzquierda=0;
-float desplazamientoLineal=0;
-int vMD=25;//valor bin proporcional al duty cicle motor derecho
-int vMI=25;// valor bin proporcional al duty cicle motor izquierdo
-int tiempoActual=0;
-int velActualDerecha=0;  //dato en RPM
-int velActualIzquierda=0; //dato en RPM
-const int tiempoGiro=0;//Unidad multiplicada por la frecuencia de muestreo. Teóricamente debería ser 1.5s
-const int velRequerida=50; //unidades RPM
-const int velRequeridaGiro=30;
-const int gradosGiro=90;
+const int velRequerida=40; //unidades RPM
+//constantes para control de mov.
 const float KpVelocidad=0.5; //constante control proporcional
 const float KdVelocidad=0.1; //constante control derivativo
 const float KiVelocidad=0.01; //constante control integral
-const float KpGiroHorario=0.4; //constante control proporcional
-const float KdGiroHorario=0.1;//constante control derivativo
-const float KiGiroHorario=0.015; //constante control integral
-const float KpGiroAntihorario=KpGiroHorario; //constante control proporcional
-const float KdGiroAntihorario=KdGiroHorario; //constante control derivativo
-const float KiGiroAntihorario=KiGiroHorario; //constante control integral
 const float KpParo=0.4; //constante control proporcional
 const float KdParo=0.1;//constante control derivativo
 const float KiParo=0.015; //constante control integral
-const int errorMinIntegral=-3000;
-const int errorMaxIntegral=3000;
-const float radioGiro=65.75;
-const float milimetrosPorPulso=0.6777184466; //avance lineal 139.5mm/rev dividido por 206 pulsos.
+//constantes para control de giro
+const float KpGiro=20; //constante control proporcional
+const float KdGiro=2;//constante control derivativo
+const float KiGiro=0.08; //constante control integral
+const int errorMinIntegral=-100;
+const int errorMaxIntegral=100;
+const int limiteSuperiorCicloTrabajoGiro=70;
+const int limiteInferiorCicloTrabajoGiro=-70;
+const float radioGiro=65.0;// estaba a 65.75
+const float errorGiroMax=0.5;
+const float errorGiroPermitido=errorGiroMax/2;
+
+//Variables para mov. lineal
+const float conversionVelocidad=(conversionSegundosTiempoMuestreo/(pulsosPorRev*factorEncoder));
+int contDistanciaDer=0;
+int contDistanciaIzq=0;
+int velActualDerecha=0;  //dato en RPM
+int velActualIzquierda=0; //dato en RPM
+int contPulsosDerecha=0;
+int contPulsosIzquierda=0;
+int vMD=25;//valor bin proporcional al duty cicle motor derecho
+int vMI=25;// valor bin proporcional al duty cicle motor izquierdo
+long tiempoActual=0;
+float distLinealRuedaDerecha=0;
+float distLinealRuedaIzquierda=0;
+float desplazamientoLineal=0;
+float pidTermDer=0;
+float errorDer=0;
+float errorAnteriorDer=0;
+float sumErrorDer=0;
+float pidTermIzq=0;
+float errorIzq=0;
+float errorAnteriorIzq=0;
+float sumErrorIzq=0;
+
+//Variables para el giro
+float contGiroDer=0;
+float contGiroIzq=0;
+float pidTermGiroDer=0;
+float errorGiroDer=0;
+float errorAnteriorGiroDer=0;
+float sumErrorGiroDer=0;
+float pidTermGiroIzq=0;
+float errorGiroIzq=0;
+float errorAnteriorGiroIzq=0;
+float sumErrorGiroIzq=0;
+float posActualDerecha=0.0;
+float posActualIzquierda=0.0;
+float despAngular=0.0;
+int contGiroCorrecto=0; //Contador que me indica si ya el robot está en la posición correcta por N cantidad de veces.
+
+//Variables para máquina de estados
 bool giro=false;
-bool avance=false;
-int contTemp=0;
-int state=0;
-int cTiempoGiro=0;
+bool avance=true;
+bool pare=false;
+//long contTemp=0;  ESTE CONTADOR ES PARA LLEVAR EL TIEMPO EN LA MÁQUINA DE ESTADOS.
 
-
-
+//Variables para interrupción encoders
+boolean A,B,C,D;
+byte state,state2;
+byte statep,statep2;
+int randNumber=1;
 void setup() {
   // put your setup code here, to run once:
   pinMode(PWMA, OUTPUT);
@@ -62,205 +95,155 @@ void setup() {
   pinMode(PWMB, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
-  attachInterrupt(A0, PulsosRuedaDerecha, RISING);  //conectado el contador C1 rueda derecha
-  //attachInterrupt(A1, DC2, CHANGE);
-  attachInterrupt(A2, PulsosRuedaIzquierda, RISING); //conectado el contador C1 rueda izquierda
-  //attachInterrupt(A3, IC2, CHANGE);
+  attachInterrupt(A0, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
+  attachInterrupt(A1, PulsosRuedaDerechaC2,CHANGE); //conectado el contador C1 rueda izquierda
+  attachInterrupt(A2, PulsosRuedaIzquierdaC1,CHANGE);
+  attachInterrupt(A3, PulsosRuedaIzquierdaC2,CHANGE);
+  attachInterrupt(A4, DeteccionObjeto,LOW);
   Serial.begin(9600);
-  tiempoActual=millis();
+  tiempoActual=micros();
 }
 
-
+//ESTE LOOP ES EL DE POSICIÓN, CORREGIR.
 void loop() {
-  if((millis()-tiempoActual)>=tiempoMuestreo){
-    Serial.print(contDistanciaIzq);
-    Serial.print(" ");
-    Serial.println(contDistanciaDer);
-    tiempoActual=millis();
-    Velocidad();
-    Distancia();
-    Avanzar();
-    contTemp++; //depende del tiempo de muestreo  contTemp*tiempoMuestreo=> ms por evento  
-    cTiempoGiro++;   
+  Distancia();
+  
+  
+  
+  if((micros()-tiempoActual)>=tiempoMuestreo){
+    tiempoActual=micros();
     
-    
-    if(contTemp>=20000){
-        contTemp=0;} 
-    if( contTemp>=0 && contTemp<5000){ //giri izq
-      giro=true;
-      Giro(90);
-      avance=false;
+    if(avance==true){
+      Serial.println("prueba");
+      Velocidad();
+      Avanzar();
     }
-    else if( contTemp>=5000 && contTemp<10000){// parar
-      if(contTemp==9999){
-      contDistanciaDer=0;
-      contDistanciaIzq=0;
-      }
-      cTiempoGiro=0; //prueba
-      avance=false;
-      giro=false;
-      if(contTemp>8000){
-        Parar();
-        avance=false;
-      }
+    if(giro==true){
      
-    }
-    
-    else if( contTemp>=10000 && contTemp<15000){ //Girar
-      avance=false;
-      giro=true;
-      Giro(-90);
+      Giro(90*randNumber);  
       
     }
-    else if( contTemp>=15000 && contTemp<20000){ // Parar
-      if(contTemp==19999){
-      contDistanciaDer=0;
-      contDistanciaIzq=0;}
-      cTiempoGiro=0; //prueba
-      giro=false;
-      avance=false;
-      if(contTemp>18000){
-        Parar();
-        avance=false;
-      }
-     
-    }       
-  }  
+    if(pare==true){
+      Parar();
+      giro=true;
+      contGiroDer=0;
+      contGiroIzq=0;
+  }
+  } 
 }
 
 void Giro(int grados){
-  //la función correspondiente realiza el giro a la derecha
-  if(giro==true && (cTiempoGiro<=TiempoGiro(abs(grados))) && grados>0){
-    digitalWrite(AIN1, HIGH);
-    digitalWrite(AIN2, LOW);
-    vMI=ControlVelocidadGiroRuedaIzquierdaAntihorario(vMI,velRequeridaGiro,velActualIzquierda);
-    analogWrite(PWMA, vMI);
+//la función correspondiente realiza el giro a la derecha
+  posActualDerecha=ConvDespAngular(contGiroDer);
+  vMD=ControlPosGiroRuedaDerecha(grados,posActualDerecha);
+  posActualIzquierda=ConvDespAngular(contGiroIzq);
+  vMI=ControlPosGiroRuedaIzquierda(grados,posActualIzquierda);
+  if(vMD==0 && vMI==0){
+    digitalWrite(13,HIGH);
+    contGiroCorrecto++;
+    if(contGiroCorrecto>20){ //Si ya llevo 10 tiempos de muestreo en la pos. correcta, termina el giro.
+      Parar();
+      giro=false;
+      avance=true;
+      contGiroCorrecto = 0;
+    }
+  }
+  else{
+    digitalWrite(13,LOW);
+  }
+  if(vMD>0){
     digitalWrite(BIN1, LOW);
     digitalWrite(BIN2, HIGH); 
-    vMD=ControlVelocidadGiroRuedaDerechaAntihorario(vMD,velRequeridaGiro,velActualDerecha);
     analogWrite(PWMB, vMD);
-   }
-   
-  if(giro==true && (cTiempoGiro<=TiempoGiro(abs(grados))) && grados<0){
-    digitalWrite(AIN1, LOW);
-    digitalWrite(AIN2, HIGH);
-    vMI=ControlVelocidadGiroRuedaIzquierdaHorario(vMI,velRequeridaGiro,velActualIzquierda);
-    analogWrite(PWMA, vMI);
+  }
+  else if(vMD<0){
     digitalWrite(BIN1, HIGH);
     digitalWrite(BIN2, LOW); 
-    vMD=ControlVelocidadGiroRuedaDerechaHorario(vMD,velRequeridaGiro,velActualDerecha);
-    analogWrite(PWMB, vMD); 
+    analogWrite(PWMB, -vMD);
   }
-
-  if(cTiempoGiro>=TiempoGiro(abs(grados))){
-    Parar();
+  else if(vMD==0){
+     digitalWrite(BIN1, LOW);
+     digitalWrite(BIN2, LOW);
+     analogWrite(PWMB,0);
   }
-}
-void Parar(){
-  digitalWrite(AIN1, LOW);
-  digitalWrite(AIN2, LOW);
-  analogWrite(PWMA, vMI);
-  digitalWrite(BIN1, LOW);
-  digitalWrite(BIN2, LOW); 
-  analogWrite(PWMB, vMD);
   
-}
+  if(vMI>0){
+    digitalWrite(AIN1, HIGH);
+    digitalWrite(AIN2, LOW); 
+    analogWrite(PWMA, vMI);
+  }
+  else if(vMI<0){
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, HIGH); 
+    analogWrite(PWMA, -vMI);
+  }
+  else if(vMI==0){
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, LOW);
+    analogWrite(PWMA,0);
+  }
+} 
 
-int ControlVelocidadGiroRuedaDerechaHorario(int command, int velRef, int velActual){
+int ControlPosGiroRuedaDerecha( float posRef, float posActual){
   //Funcion para implementar el control PID de la velocidad de la rueda Derecha para el giro
-  float pidTermGiroDerHorario=0;
-  int errorGiroDerHorario=0;
-  static int errorAnteriorGiroDerHorario=0;
-  static int sumErrorGiroDerHorario=0;
-  errorGiroDerHorario=abs(velRef)-abs(velActual);
-  pidTermGiroDerHorario= (KpGiroHorario*errorGiroDerHorario)+KiGiroHorario*sumErrorGiroDerHorario+(KdGiroHorario*(errorGiroDerHorario-errorAnteriorGiroDerHorario));
-  sumErrorGiroDerHorario+= errorGiroDerHorario;
-  sumErrorGiroDerHorario=constrain(sumErrorGiroDerHorario,errorMinIntegral,errorMaxIntegral);
-  return constrain(command + int (pidTermGiroDerHorario),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
+  errorGiroDer=posRef-posActual;
+  sumErrorGiroDer+= errorGiroDer;
+  sumErrorGiroDer=constrain(sumErrorGiroDer,errorMinIntegral,errorMaxIntegral);
+  pidTermGiroDer= (KpGiro*errorGiroDer)+KiGiro*sumErrorGiroDer+(KdGiro*(errorGiroDer-errorAnteriorGiroDer));
+  errorAnteriorGiroDer=errorGiroDer;
+  if(errorGiroDer>-errorGiroPermitido && errorGiroDer<errorGiroPermitido){
+    pidTermGiroDer=0;
+  }
+  if(pidTermGiroDer>0){
+    pidTermGiroDer=map(pidTermGiroDer,0,55,30,limiteSuperiorCicloTrabajoGiro);
+  }
+  if(pidTermGiroDer<0){
+    pidTermGiroDer=map(pidTermGiroDer,-55,0,limiteInferiorCicloTrabajoGiro,-30);
+  }
+  return constrain( int (pidTermGiroDer),limiteInferiorCicloTrabajoGiro,limiteSuperiorCicloTrabajoGiro);  
 }
-int ControlVelocidadGiroRuedaIzquierdaHorario(int command, int velRef, int velActual){
-  //Funcion que permite implementar el control PID de la rueda izquierda para el giro
-  float pidTermGiroIzqHorario=0;
-  int errorGiroIzqHorario=0;
-  static int errorAnteriorGiroIzqHorario=0;
-  static int sumErrorGiroIzqHorario=0;
-  errorGiroIzqHorario=abs(velRef)-abs(velActual);
-  pidTermGiroIzqHorario= (KpGiroHorario*errorGiroIzqHorario)+KiGiroHorario*sumErrorGiroIzqHorario+(KdGiroHorario*(errorGiroIzqHorario-errorAnteriorGiroIzqHorario));
-  sumErrorGiroIzqHorario+= errorGiroIzqHorario;
-  sumErrorGiroIzqHorario=constrain(sumErrorGiroIzqHorario,errorMinIntegral,errorMaxIntegral);
-  errorAnteriorGiroIzqHorario=errorGiroIzqHorario;
-  return constrain(command + int (pidTermGiroIzqHorario),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
-}
-int ControlVelocidadGiroRuedaDerechaAntihorario(int command, int velRef, int velActual){
+
+int ControlPosGiroRuedaIzquierda( float posRef, float posActual){
   //Funcion para implementar el control PID de la velocidad de la rueda Derecha para el giro
-  float pidTermGiroDerAntihorario=0;
-  int errorGiroDerAntihorario=0;
-  static int errorAnteriorGiroDerAntihorario=0;
-  static int sumErrorGiroDerAntihorario=0;
-  errorGiroDerAntihorario=abs(velRef)-abs(velActual);
-  pidTermGiroDerAntihorario= (KpGiroAntihorario*errorGiroDerAntihorario)+KiGiroAntihorario*sumErrorGiroDerAntihorario+(KdGiroAntihorario*(errorGiroDerAntihorario-errorAnteriorGiroDerAntihorario));
-  sumErrorGiroDerAntihorario+= errorGiroDerAntihorario;
-  sumErrorGiroDerAntihorario=constrain(sumErrorGiroDerAntihorario,errorMinIntegral,errorMaxIntegral);
-  errorAnteriorGiroDerAntihorario=errorGiroDerAntihorario;
-  return constrain(command + int (pidTermGiroDerAntihorario),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
-}
-int ControlVelocidadGiroRuedaIzquierdaAntihorario(int command, int velRef, int velActual){
-  //Funcion que permite implementar el control PID de la rueda izquierda para el giro
-  float pidTermGiroIzqAntihorario=0;
-  int errorGiroIzqAntihorario=0;
-  static int errorAnteriorGiroIzqAntihorario=0;
-  static int sumErrorGiroIzqAntihorario=0;
-  errorGiroIzqAntihorario=abs(velRef)-abs(velActual);
-  pidTermGiroIzqAntihorario= (KpGiroAntihorario*errorGiroIzqAntihorario)+KiGiroAntihorario*sumErrorGiroIzqAntihorario+(KdGiroAntihorario*(errorGiroIzqAntihorario-errorAnteriorGiroIzqAntihorario));
-  sumErrorGiroIzqAntihorario+= errorGiroIzqAntihorario;
-  sumErrorGiroIzqAntihorario=constrain(sumErrorGiroIzqAntihorario,errorMinIntegral,errorMaxIntegral);
-  errorAnteriorGiroIzqAntihorario=errorGiroIzqAntihorario;
-  return constrain(command + int (pidTermGiroIzqAntihorario),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
-}
-int TiempoGiro(int grados){
-  //t=(n vueltas*60s/min)/(rpm)*1/tiempoMuestreo
-  //La siguiente fórmula calcula la cantidad de eventos que contTemp debe llevar a cabo para dar n vueltas
-  //el tiempo de muestreo es en ms, se compara con un contador que cambia en ms también
-  //Función que se requiere para dar el giro en los grados 
-  // la cantidad de revoluciones por giro esta asociada al radio de giro por  rev/206pulsos*pulsos/mmPorPulso*radioGiro*grados(en rad).
-  int contGiro=(radioGiro*grados*60*1000*3.14)/(180*pulsosPorRev*milimetrosPorPulso*velRequeridaGiro*tiempoMuestreo);
-  return  int(contGiro);
+  errorGiroIzq=posRef-posActual;
+  sumErrorGiroIzq+= errorGiroIzq;
+  sumErrorGiroIzq=constrain(sumErrorGiroIzq,errorMinIntegral,errorMaxIntegral);
+  pidTermGiroIzq= (KpGiro*errorGiroIzq)+KiGiro*sumErrorGiroIzq+(KdGiro*(errorGiroIzq-errorAnteriorGiroIzq));
+  errorAnteriorGiroIzq=errorGiroIzq;
+  if(errorGiroIzq>-errorGiroPermitido && errorGiroIzq<errorGiroPermitido){
+    pidTermGiroIzq=0;
+  }
+   if(pidTermGiroIzq>0){
+    pidTermGiroIzq=map(pidTermGiroIzq,0,55,35,limiteSuperiorCicloTrabajoGiro);
+  }
+  if(pidTermGiroIzq<0){
+    pidTermGiroIzq=map(pidTermGiroIzq,-55,0,limiteInferiorCicloTrabajoGiro,-35);
+  }
+  return constrain( int (pidTermGiroIzq),limiteInferiorCicloTrabajoGiro,limiteSuperiorCicloTrabajoGiro);  
 }
 
-int ControlVelocidadDerecha(int command, int velRef, int velActual){
-  //Funcion para implementar el control PID de la velocidad de la rueda Derecha
-  float pidTermDer=0;
-  int errorDer=0;
-  static int errorAnteriorDer=0;
-  static int sumErrorDer=0;
-  errorDer=abs(velRef)-abs(velActual);
-  pidTermDer= (KpVelocidad*errorDer)+KiVelocidad*sumErrorDer+(KdVelocidad*(errorDer-errorAnteriorDer));
-  sumErrorDer+= errorDer;
-  sumErrorDer=constrain(sumErrorDer,errorMinIntegral,errorMaxIntegral);
-  errorAnteriorDer=errorDer;
-  return constrain(command + int (pidTermDer),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
-}
-int ControlVelocidadIzquierda(int command, int velRef, int velActual){
-  //Funcion que permite implementar el control PID de la rueda izquierda
-  float pidTermIzq=0;
-  int errorIzq=0;
-  static int errorAnteriorIzq=0;
-  static int sumErrorIzq=0;
-  errorIzq=abs(velRef)-abs(velActual);
-  pidTermIzq= (KpVelocidad*errorIzq)+KiVelocidad*sumErrorIzq+(KdVelocidad*(errorIzq-errorAnteriorIzq));
-  sumErrorIzq+= errorIzq;
-  sumErrorIzq=constrain(sumErrorIzq,errorMinIntegral,errorMaxIntegral);
-  errorAnteriorIzq=errorIzq;
-  return constrain(command + int (pidTermIzq),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
+float ConvDespAngular(float pulsos){
+  despAngular=(pulsos*avanceLineal*180)/(radioGiro*factorEncoder*pulsosPorRev*3.141592);
+  return despAngular;
 }
 
+void Velocidad(){
+  //Esta función calcula las rpm en cada una de las ruedas 
+    velActualDerecha=contPulsosDerecha*conversionVelocidad; //conversión de pulsos/s a RPM
+    velActualIzquierda=contPulsosIzquierda*conversionVelocidad;
+    contPulsosDerecha=0;
+    contPulsosIzquierda=0;
+}
 
-
-
+void Distancia(){
+  //se realiza el cálculo de la distancia lineal recorrida por cada una de las ruedas y luego se realiza el promedio, utiliza el modelo de odometría
+  distLinealRuedaDerecha=float(contDistanciaDer)*pulsosPorMilimetro;
+  distLinealRuedaIzquierda=float(contDistanciaIzq)*pulsosPorMilimetro;
+  desplazamientoLineal=(distLinealRuedaDerecha+distLinealRuedaIzquierda)/2.0;
+}
 
 void Avanzar(){
   //Permite el avance del carro al poner las patillas correspondientes del puente H en alto
-  if(avance==true){
   digitalWrite(AIN1, LOW);
   digitalWrite(AIN2, HIGH);
   vMI=ControlVelocidadIzquierda(vMI,velRequerida,velActualIzquierda);
@@ -269,36 +252,187 @@ void Avanzar(){
   digitalWrite(BIN2, HIGH); 
   vMD=ControlVelocidadDerecha(vMD,velRequerida,velActualDerecha);
   analogWrite(PWMB, vMD); 
+}
+
+int ControlVelocidadDerecha(int command, int velRef, int velActual){
+  //Funcion para implementar el control PID de la velocidad de la rueda Derecha
+  errorDer=abs(velRef)-abs(velActual);
+  sumErrorDer+= errorDer;
+  sumErrorDer=constrain(sumErrorDer,errorMinIntegral,errorMaxIntegral);
+  pidTermDer= (KpVelocidad*errorDer)+KiVelocidad*sumErrorDer+(KdVelocidad*(errorDer-errorAnteriorDer));
+  errorAnteriorDer=errorDer;
+  return constrain(command + int (pidTermDer),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
+}
+
+int ControlVelocidadIzquierda(int command, int velRef, int velActual){
+  //Funcion que permite implementar el control PID de la rueda izquierda
+  errorIzq=abs(velRef)-abs(velActual);
+  sumErrorIzq+= errorIzq;
+  sumErrorIzq=constrain(sumErrorIzq,errorMinIntegral,errorMaxIntegral);
+  errorAnteriorIzq=errorIzq;
+  pidTermIzq= (KpVelocidad*errorIzq)+KiVelocidad*sumErrorIzq+(KdVelocidad*(errorIzq-errorAnteriorIzq));
+  return constrain(command + int (pidTermIzq),limiteInferiorCicloTrabajo,limiteSuperiorCicloTrabajo);  
+}
+
+void Parar(){
+  if(giro==0 && avance==0 && pare==true){
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, LOW);
+  analogWrite(PWMA, vMI);
+  digitalWrite(BIN1, LOW);
+  digitalWrite(BIN2, LOW); 
+  analogWrite(PWMB, vMD);
+  delay(250);
+  pare=false;
   }
 }
 
-
-  
-
-
-void Velocidad(){
-  //Esta función calcula las rpm en cada una de las ruedas 
-    velActualDerecha=contPulsosDerecha*conversionSegundosTiempoMuestreo/pulsosPorRev; //conversión de pulsos/s a RPM
-    velActualIzquierda=contPulsosIzquierda*conversionSegundosTiempoMuestreo/pulsosPorRev;
-    contPulsosDerecha=0;
-    contPulsosIzquierda=0;
-    
-}
-void Distancia(){
-  //se realiza el cálculo de la distancia lineal recorrida por cada una de las ruedas y luego se realiza el promedio, utiliza el modelo de odometría
-  distLinealRuedaDerecha=float(contDistanciaDer)*milimetrosPorPulso;
-  distLinealRuedaIzquierda=float(contDistanciaIzq)*milimetrosPorPulso;
-  desplazamientoLineal=(distLinealRuedaDerecha+distLinealRuedaIzquierda)/2.0;
+//Interrupciones:
+void PulsosRuedaDerechaC1(){
+  EncoderDerecho();
 }
 
-void PulsosRuedaDerecha(){
-  //Esta funcion lleva la cuenta de los pulsos del encoder C1 en la rueda derecha
-    contPulsosDerecha++; //Utilicado para el cálculo de velocidad
-    contDistanciaDer++;
+void PulsosRuedaDerechaC2(){
+  EncoderDerecho();
 }
 
-void PulsosRuedaIzquierda(){
-  //Esta funcion lleva la cuenta de los pulsos del enconder C1 en la rueda izquierda
-    contPulsosIzquierda++; //Utilizado para el cálculo de velocidad 
-    contDistanciaIzq++;
+void EncoderDerecho(){
+  A = digitalRead(A0);
+  B = digitalRead(A1);
+
+  if ((A==HIGH)&&(B==HIGH)) state = 1;
+  if ((A==HIGH)&&(B==LOW)) state = 2;
+  if ((A==LOW)&&(B==LOW)) state = 3;
+  if((A==LOW)&&(B==HIGH)) state = 4;
+  switch (state)
+  {
+    case 1:
+    {
+      if (statep == 2){
+        contGiroDer--;
+        contPulsosDerecha--;
+      }
+      if (statep == 4){
+        contGiroDer++;
+        contPulsosDerecha++;
+      }
+      break;
+    }
+    case 2:
+    {
+      if (statep == 1){
+        contGiroDer++;
+        contPulsosDerecha++;
+      }
+      if (statep == 3){
+        contGiroDer--;
+        contPulsosDerecha--;
+      }
+      break;
+    }
+    case 3:
+    {
+      if (statep == 2){
+        contGiroDer++;
+        contPulsosDerecha++;
+      }
+      if (statep == 4){
+        contGiroDer--;
+        contPulsosDerecha--;
+      }
+      break;
+    }
+    default:
+    {
+      if (statep == 1){
+        contGiroDer--;
+        contPulsosDerecha--;
+      }
+      if (statep == 3){
+        contGiroDer++;
+        contPulsosDerecha++;
+      }
+    }
+  }
+  statep = state;
+}
+
+void PulsosRuedaIzquierdaC1(){
+ EncoderIzquierdo();
+}
+
+void PulsosRuedaIzquierdaC2(){
+  EncoderIzquierdo();
+}
+
+void EncoderIzquierdo(){
+  C = digitalRead(A2);
+  D = digitalRead(A3);
+
+  if ((C==HIGH)&&(D==HIGH)) state2 = 1;
+  if ((C==HIGH)&&(D==LOW)) state2 = 2;
+  if ((C==LOW)&&(D==LOW)) state2 = 3;
+  if((C==LOW)&&(D==HIGH)) state2 = 4;
+  switch (state2)
+  {
+    case 1:
+    {
+      if (statep2 == 2){ 
+        contGiroIzq--;
+        contPulsosIzquierda--;
+      }
+      if (statep2 == 4){ 
+        contGiroIzq++;
+        contPulsosIzquierda++;
+      }
+      break;
+    }
+    case 2:
+    {
+      if (statep2 == 1){ 
+        contGiroIzq++;
+        contPulsosIzquierda++;
+      }
+      if (statep2 == 3){ 
+        contGiroIzq--;
+        contPulsosIzquierda--;
+      }
+      break;
+    }
+    case 3:
+    {
+      if (statep2 == 2){ 
+        contGiroIzq++;
+        contPulsosIzquierda++;
+      }
+      if (statep2 == 4){ 
+        contGiroIzq--;
+        contPulsosIzquierda--;
+      }
+      break;
+    }
+    default:
+    {
+      if (statep2 == 1){ 
+        contGiroIzq--;
+        contPulsosIzquierda--;
+      }
+      if (statep2 == 3){ 
+        contGiroIzq++;
+        contPulsosIzquierda++;
+      }
+    }
+  }
+  statep2 = state2;
+}
+
+void DeteccionObjeto(){
+  if(giro==0 && avance==1){
+    randNumber = random(-1, 2);
+  while(randNumber == 0){
+    randNumber = random(-1, 2);
+  }
+  pare=true;
+  avance=false;
+  }
 }
