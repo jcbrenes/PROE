@@ -10,6 +10,7 @@ const float pulsosPorRev=206.0;
 const int factorEncoder=4;
 const int limiteSuperiorCicloTrabajo=255;
 const int limiteInferiorCicloTrabajo=0;
+const float avanceLineal=139.5;//139.5
 const float pulsosPorMilimetro=(factorEncoder*pulsosPorRev)/avanceLineal; //avance lineal 139.5mm/rev dividido por 206*2 pulsos.
 
 const float KpVelocidad=0.5; //constante control proporcional
@@ -21,10 +22,12 @@ const float KdGiro=2;//constante control derivativo
 const float KiGiro=0.08; //constante control integral
 const int errorMinIntegral=-100;
 const int errorMaxIntegral=100;
-const int limiteSuperiorCicloTrabajoGiro=55;
-const int limiteInferiorCicloTrabajoGiro=-55;
+const int limiteSuperiorCicloTrabajoGiro=60;
+const int limiteInferiorCicloTrabajoGiro=-60;
 const float radioGiro=65.0;// estaba a 65.75
-const float avanceLineal=139.5;//139.5
+const float errorGiroMax=0.5;
+const float errorGiroPermitido=errorGiroMax/2;
+
 
 int contGiroDer=0;
 int contGiroIzq=0;
@@ -41,8 +44,8 @@ float posActualDerecha=0.0;
 float posActualIzquierda=0.0;
 float despAngular=0.0;
 
-int contPulsosDerecha=0;
-int contPulsosIzquierda=0;
+float contPulsosDerecha=0;
+float contPulsosIzquierda=0;
 int vMD=25;//valor bin proporcional al duty cicle motor derecho
 int vMI=25;// valor bin proporcional al duty cicle motor izquierdo
 long tiempoActual=0;
@@ -94,7 +97,7 @@ void loop(){
   }
   
 }
-void Giro(int grados){
+void Giro(float grados){
   //la función correspondiente realiza el giro a la derecha
   if(giro==true){
     posActualDerecha=ConvDespAngular(contGiroDer);
@@ -104,12 +107,7 @@ void Giro(int grados){
     Serial.print(vMD);
     Serial.print(",");
     Serial.println(vMI);
-    if(vMD==0 && vMI==0){
-      digitalWrite(13,HIGH);
-    }
-    else{
-      digitalWrite(13,LOW);
-    }
+  
     if(vMD>0){
       digitalWrite(BIN1, LOW);
       digitalWrite(BIN2, HIGH); 
@@ -137,10 +135,16 @@ void Giro(int grados){
       analogWrite(PWMA, -vMI);
   }
    else if(vMI==0){
-      digitalWrite(BIN1, LOW);
-      digitalWrite(BIN2, LOW);
+      digitalWrite(AIN1, LOW);
+      digitalWrite(AIN2, LOW);
       analogWrite(PWMA,0);
   }
+    if(vMD==0 && vMI==0){
+      digitalWrite(13,HIGH);
+    }
+    else{
+      digitalWrite(13,LOW);
+    }
 }
 } 
 
@@ -151,20 +155,34 @@ int ControlPosGiroRuedaDerecha( float posRef, float posActual){
   sumErrorGiroDer=constrain(sumErrorGiroDer,errorMinIntegral,errorMaxIntegral);
   pidTermGiroDer= (KpGiro*errorGiroDer)+KiGiro*sumErrorGiroDer+(KdGiro*(errorGiroDer-errorAnteriorGiroDer));
   errorAnteriorGiroDer=errorGiroDer;
-  if(errorGiroDer>-0.5 && errorGiroDer<0.5){
+  if(errorGiroDer>-errorGiroPermitido && errorGiroDer<errorGiroPermitido){
     pidTermGiroDer=0;
+  }
+  if(pidTermGiroDer>0){
+    pidTermGiroDer=map(pidTermGiroDer,0,55,25,limiteSuperiorCicloTrabajoGiro);
+  }
+  
+  if(pidTermGiroDer<0){
+    pidTermGiroDer=map(pidTermGiroDer,-55,0,limiteInferiorCicloTrabajoGiro,-25);
   }
   return constrain( int (pidTermGiroDer),limiteInferiorCicloTrabajoGiro,limiteSuperiorCicloTrabajoGiro);  
 }
-int ControlPosGiroRuedaIzquierda( float posRef, float posActual){
+int ControlPosGiroRuedaIzquierda( float posRefI, float posActualI){
   //Funcion para implementar el control PID de la velocidad de la rueda Derecha para el giro
-  errorGiroIzq=posRef-posActual;
+  errorGiroIzq=posRefI-posActualI;
   sumErrorGiroIzq+= errorGiroIzq;
   sumErrorGiroIzq=constrain(sumErrorGiroIzq,errorMinIntegral,errorMaxIntegral);
   pidTermGiroIzq= (KpGiro*errorGiroIzq)+KiGiro*sumErrorGiroIzq+(KdGiro*(errorGiroIzq-errorAnteriorGiroIzq));
   errorAnteriorGiroIzq=errorGiroIzq;
-  if(errorGiroIzq>-0.5 && errorGiroIzq<0.5){
+  if(errorGiroIzq>-errorGiroPermitido && errorGiroIzq<errorGiroPermitido){
     pidTermGiroIzq=0;
+  }
+   if(pidTermGiroIzq>0){
+    pidTermGiroIzq=map(pidTermGiroIzq,0,55,25,limiteSuperiorCicloTrabajoGiro);
+  }
+  
+  if(pidTermGiroIzq<0){
+    pidTermGiroIzq=map(pidTermGiroIzq,-55,0,limiteInferiorCicloTrabajoGiro,-25);
   }
   return constrain( int (pidTermGiroIzq),limiteInferiorCicloTrabajoGiro,limiteSuperiorCicloTrabajoGiro);  
 }
@@ -261,5 +279,7 @@ void EncoderIzquierdo(){
   }
   statep2 = state2;
 }
+
+
 
 
