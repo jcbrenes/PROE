@@ -47,11 +47,14 @@ const int ENC_DER_C2 =  A1;
 const int ENC_IZQ_C1 =  A2; //Encoders rueda izquierda
 const int ENC_IZQ_C2 =  A3;
 
+//Configuracion de los pines de interrupcion de Obstáculos
+const int INT_OBSTACULO = A4;
+
 //Variables globales que se utilizan en el control de movimientos
 
 //Variables para la máquina de estados principal
-enum PosiblesEstados {AVANCE=0, GIRE_DERECHA, GIRE_IZQUIERDA, NADA};
-char *PosEstados[] = {"AVANCE", "GIRE_DERECHA", "GIRE_IZQUIERDA", "NADA"};
+enum PosiblesEstados {AVANCE=0, GIRE_DERECHA, GIRE_IZQUIERDA,ESCOGER_DIRECCION,GIRO, NADA};
+char *PosEstados[] = {"AVANCE", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
 PosiblesEstados estado = AVANCE;
 
 //variable que almacena el tiempo del último ciclo de muestreo
@@ -88,6 +91,19 @@ float sumErrorVelIzq=0;
 byte estadoEncoderDer=1; 
 byte estadoEncoderIzq=1;
 
+//Variables para el algoritmo de exploracion
+bool giroAnteriorIzquierda=0;
+bool giroAnteriorDerecha=0;
+int direccionDeseada=1;//random(1,5);//asigna direccion N,S,E,O 
+int direccionActual=1; // 1=N, 2=E, 3=S, 4=O
+bool giroTerminado=1;
+bool detectaObjeto=0;
+int anguloGiro = 90;
+bool direccionAdelanteDisponible=1;
+bool direccionIzquierdaDisponible=1;
+bool direccionDerechaDisponible=1;
+int opcionGiro=0;// puede tener 3 valores, 1=Izquierda 2=Adelante, 3=Derecha
+bool asignarDireccionDeseada=0;
 
 void setup() {
   pinMode(PWMA, OUTPUT);
@@ -96,13 +112,19 @@ void setup() {
   pinMode(PWMB, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
+  pinMode(INT_OBSTACULO, INPUT_PULLUP);
   pinMode(13,OUTPUT);
   attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
   attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
   attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
   attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObjeto,FALLING);
   Serial.begin(9600);
   tiempoActual=micros();
+  //Para el algoritmo de exploración
+  randomSeed(analogRead(A5));
+  delay(3000);
+  //direccionDeseada=random(1,5);//asigna direccion N,S,E,O
 }
 
 void loop(){
@@ -137,6 +159,28 @@ void loop(){
           }        
           break; 
         }
+        case ESCOGER_DIRECCION: {
+          EscogerDireccion();
+          estado= GIRO;
+        }
+        case GIRO: {
+          bool giroTerminado=Giro(anguloGiro);
+          if(giroTerminado){
+            ConfiguracionParar();
+            if(digitalRead(INT_OBSTACULO)==1){// no hay un obstáculo, el giro es exitoso.
+              detectaObjeto=0;
+              if(asignarDireccionDeseada==1){
+                AsignarDireccionDeseada(opcionGiro);
+                asignarDireccionDeseada=0;
+              }
+              estado=AVANCE;
+              ReinicioEstadosDisponiblesGiro();
+            }
+           else if(digitalRead(INT_OBSTACULO)==0){// hay un obstáculo, giro no es exitoso.
+             estado=ESCOGER_DIRECCION;
+           }
+          }
+        }
         case NADA: { 
           break; 
         }
@@ -145,6 +189,258 @@ void loop(){
   }
  
 }
+void AsignarDireccionDeseada(int direccion){//direccion puede valer 1(Izquierda) o 3(Derecha)
+  //Esta funcion se utiliza únicamente si hubo un obstáculo en dirección deseada, reasigna la dirección deseada con base en la actualy el giro realizado
+   direccionDeseada=direccionActual;   
+}
+void ReinicioEstadosDisponiblesGiro(){
+  direccionAdelanteDisponible=1;
+  direccionDerechaDisponible=1;
+  direccionIzquierdaDisponible=1;
+}
+
+void AsignaDireccionSinObstaculo(){
+  if(direccionActual==direccionDeseada){
+          opcionGiro=random(1,4);// 1=izquierda 2=avanza 3=derecha
+  }
+  else if(direccionActual!=direccionDeseada){
+    if(abs(direccionActual-direccionDeseada)==2){//completamente en la direccion opuesta
+      opcionGiro=4;
+    }
+    else if(giroAnteriorIzquierda==1){
+      opcionGiro=random(2,4);//gire derecha o adelante
+    }
+    else if(giroAnteriorDerecha==1){
+      opcionGiro=random(1,3);//gire izquierda o adelante
+    }
+    else if(giroAnteriorDerecha==0 && giroAnteriorIzquierda==0){
+      //Asume que siempre se coloca en direccion Norte
+      if(direccionDeseada==2){//si la deseada es  Este
+        opcionGiro=3; //Gire a la izquierda
+      }
+      if(direccionDeseada==4){//si la deseada es Oeste
+        opcionGiro=1;//gire a la derecha
+      }
+    }
+  }
+
+
+}
+void AsignaDireccionConObstaculo(){
+  if(direccionActual==direccionDeseada){
+      direccionAdelanteDisponible=0;
+      asignarDireccionDeseada=1;
+      if(direccionDerechaDisponible==1 && direccionIzquierdaDisponible==1){
+        opcionGiro=random(1,3);//si es 1, gire izquierda
+        if(opcionGiro==1){
+        }
+        if(opcionGiro==2){//sino, gire derecha
+          opcionGiro=3;
+        }
+      }
+      else if(direccionDerechaDisponible==0 && direccionIzquierdaDisponible==1){
+        opcionGiro=1;
+      }
+      else if(direccionDerechaDisponible==1 && direccionIzquierdaDisponible==0){
+        opcionGiro=3;
+      }
+      else if(direccionDerechaDisponible==0 && direccionIzquierdaDisponible==0 && direccionAdelanteDisponible==0){
+        opcionGiro=4;
+      }
+             
+  }
+  else if( direccionActual!=direccionDeseada){
+    if(direccionAdelanteDisponible==1){
+    switch(direccionDeseada){
+        case 1:
+          if(direccionActual==4){
+             opcionGiro=3;
+          }
+          if(direccionActual==2){
+            opcionGiro=1;
+          }
+          break;
+        case 4:
+          if(direccionActual==1){
+            opcionGiro=1;
+          }
+          if(direccionActual==3){
+            opcionGiro=3;
+          }
+          break;
+         case 2:
+          if(direccionActual==1){
+            opcionGiro=3;
+          }
+          if(direccionActual==3){
+            opcionGiro=1;
+          }
+          break;
+          case 3:
+          if(direccionActual==2){
+            opcionGiro=3;
+           }
+          if(direccionActual==4){
+            opcionGiro=1;
+           }
+          break;
+         default:
+          break;
+      }
+      if(opcionGiro==1){
+        direccionDerechaDisponible=0;
+      }
+      if(opcionGiro==3){
+        direccionIzquierdaDisponible=0;
+      }
+    
+  }
+  else if(direccionAdelanteDisponible==0 && (direccionDerechaDisponible==1 || direccionIzquierdaDisponible==1)){
+    opcionGiro=4;
+    if(giroAnteriorDerecha==1){direccionIzquierdaDisponible=0;}
+    if(giroAnteriorIzquierda==1){direccionDerechaDisponible=0;}
+  }
+  else{
+   
+    switch(direccionDeseada){
+        case 1:
+          if(direccionActual==4){
+             opcionGiro=1;
+          }
+          if(direccionActual==2){
+            opcionGiro=3;
+          }
+          break;
+        case 4:
+          if(direccionActual==1){
+            opcionGiro=3;
+          }
+          if(direccionActual==3){
+            opcionGiro=1;
+          }
+          break;
+         case 2:
+          if(direccionActual==1){
+            opcionGiro=1;
+          }
+          if(direccionActual==3){
+            opcionGiro=3;
+          }
+          break;
+          case 3:
+          if(direccionActual==2){
+            opcionGiro=1;
+           }
+          if(direccionActual==4){
+            opcionGiro=3;
+           }
+          break;
+         default:
+          break;
+      }
+  }
+ }  
+}
+
+
+
+void EscogerDireccion(){
+
+    if(digitalRead(INT_OBSTACULO)==0){//hay un obstaculo frente
+      //Si hay obstaculo opcionGiro se limita a 1=Izquierda,3=Derecha,5=Giro180
+      //Utiliza las memorias de direccion Disponible, las cuales al avanzar regresan a 1.
+      AsignaDireccionConObstaculo();
+     }
+    else if(digitalRead(INT_OBSTACULO)==1){//Si no hay obstaculo
+      AsignaDireccionSinObstaculo();
+    }
+    switch (opcionGiro){
+      case 1://izquierda
+        giroAnteriorIzquierda=1;
+        giroAnteriorDerecha=0;
+        if(direccionActual==1) {direccionActual=4;}
+        else {direccionActual--;}
+        anguloGiro=90;
+        break;
+    
+      case 2: //Adelante
+        direccionActual=direccionActual;
+        anguloGiro=0;
+        break;
+
+      case 3://derecha
+        giroAnteriorDerecha=1;
+        giroAnteriorIzquierda=0;
+        if(direccionActual==4){direccionActual=1;}
+        else {direccionActual++;}
+        anguloGiro=-90;
+        break;
+       case 4:
+        anguloGiro=180;
+        direccionActual=direccionDeseada+2;
+        if(direccionActual==5){direccionActual=1;}
+        if(direccionActual==6){direccionActual=2;}
+        direccionDeseada=direccionActual;
+        giroAnteriorDerecha=0;
+        giroAnteriorIzquierda=0;
+        break;   
+      default:
+        break;
+    }
+ 
+      if(direccionActual==1){
+    Serial.print("^");
+   }
+    if(direccionActual==2){
+    Serial.print(">");
+   }
+    if(direccionActual==3){
+    Serial.print("v");
+   }
+    if(direccionActual==4){
+    Serial.print("<");
+   }
+   Serial.print(" ");
+      if(direccionDeseada==1){
+    Serial.print("^");
+   }
+   if(direccionDeseada==2){
+    Serial.print(">");
+   }
+    if(direccionDeseada==3){
+    Serial.print("v");
+   }
+    if(direccionDeseada==4){
+    Serial.print("<");
+   }
+    Serial.print("   ");
+    if(direccionIzquierdaDisponible==1){
+      Serial.print("<");
+    }
+   
+    if(direccionIzquierdaDisponible==0){Serial.print("*");}
+    if(direccionAdelanteDisponible==1){
+      Serial.print("^");
+    }
+    if(direccionAdelanteDisponible==0){Serial.print("*");}
+    if(direccionDerechaDisponible==1){
+      Serial.println(">");
+    }
+     if(direccionDerechaDisponible==0){Serial.println("*");}
+     giroTerminado=0;
+}
+
+void DeteccionObjeto(){
+  if(detectaObjeto==0 && giroTerminado==1){
+   detectaObjeto=1;
+   Serial.println("OBJETO!!");
+   digitalWrite(13,HIGH);
+   ConfiguracionParar();
+   estado=ESCOGER_DIRECCION;
+  } 
+   
+}
+
 
 bool Giro(float grados){
 
@@ -476,3 +772,4 @@ int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, fl
   
   return  ((int)pidTermVel); 
 }
+ 
