@@ -136,10 +136,10 @@ void loop(){
      switch (estado) {
   
         case AVANCE:  { 
-          bool avanceTerminado= AvanzarDistancia(900); 
+          bool avanceTerminado= AvanzarDistancia(100); 
           if (avanceTerminado){
             ConfiguracionParar(); //detiene el carro un momento
-            estado = GIRE_IZQUIERDA; 
+            estado = ESCOGER_DIRECCION; 
           }
           break; 
         }
@@ -170,7 +170,7 @@ void loop(){
             if(digitalRead(INT_OBSTACULO)==1){// no hay un obstáculo, el giro es exitoso.
               detectaObjeto=0;
               if(asignarDireccionDeseada==1){
-                AsignarDireccionDeseada(opcionGiro);
+                direccionDeseada=direccionActual;  
                 asignarDireccionDeseada=0;
               }
               estado=AVANCE;
@@ -189,10 +189,7 @@ void loop(){
   }
  
 }
-void AsignarDireccionDeseada(int direccion){//direccion puede valer 1(Izquierda) o 3(Derecha)
-  //Esta funcion se utiliza únicamente si hubo un obstáculo en dirección deseada, reasigna la dirección deseada con base en la actualy el giro realizado
-   direccionDeseada=direccionActual;   
-}
+
 void ReinicioEstadosDisponiblesGiro(){
   direccionAdelanteDisponible=1;
   direccionDerechaDisponible=1;
@@ -772,4 +769,3 @@ int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, fl
   
   return  ((int)pidTermVel); 
 }
- 
