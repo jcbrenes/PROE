@@ -20,7 +20,7 @@ const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
 //constantes para control de giro 
 //(ojo que estas constantes están unidas con la constante de tiempo por simplificación de la ecuación)
 const float KpGiro=5; //constante control proporcional
-const float KiGiro=15.0 * tiempoMuestreoS;//constante control integral
+const float KiGiro=25.0 * tiempoMuestreoS;//constante control integral
 const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
 //Constantes para las ecuaciones de control PID
@@ -137,7 +137,7 @@ void loop(){
   
         case AVANCE:  { 
           bool avanceTerminado= AvanzarDistancia(100); 
-          if (avanceTerminado){
+          if (avanceTerminado || !digitalRead(INT_OBSTACULO)){
             ConfiguracionParar(); //detiene el carro un momento
             estado = ESCOGER_DIRECCION; 
           }
