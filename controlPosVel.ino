@@ -14,8 +14,8 @@ const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
 //constantes para control de velocidad
 const float velRequerida=250; //unidades mm/s
-const float KpVel=4; //constante control proporcional
-const float KiVel=3.0 * tiempoMuestreoS; //constante control integral
+const float KpVel=2; //constante control proporcional
+const float KiVel=20.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
 //constantes para control de giro 
 //(ojo que estas constantes están unidas con la constante de tiempo por simplificación de la ecuación)
