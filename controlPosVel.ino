@@ -13,25 +13,25 @@ const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (
 const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
 //constantes para control de velocidad
-const float velRequerida=250; //unidades mm/s
+const float velRequerida=150; //unidades mm/s
 const float KpVel=2; //constante control proporcional
 const float KiVel=20.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
 //constantes para control de giro 
 //(ojo que estas constantes están unidas con la constante de tiempo por simplificación de la ecuación)
-const float KpGiro=5; //constante control proporcional
-const float KiGiro=25.0 * tiempoMuestreoS;//constante control integral
+const float KpGiro=2; //constante control proporcional
+const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
 const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
 //Constantes para las ecuaciones de control PID
-const int errorMinIntegral=-100;
-const int errorMaxIntegral=100;
-const int limiteSuperiorCicloTrabajoVelocidad=100;
+const int errorMinIntegral=-250;
+const int errorMaxIntegral=250;
+const int limiteSuperiorCicloTrabajoVelocidad=200;
 const int limiteInferiorCicloTrabajoVelocidad=0;
-const int limiteSuperiorCicloTrabajoGiro=100;
-const int limiteInferiorCicloTrabajoGiro=-100;
-const int cicloTrabajoMinimo= 45;
-const int minCiclosEstacionario= 10;
+const int limiteSuperiorCicloTrabajoGiro=200;
+const int limiteInferiorCicloTrabajoGiro=-200;
+const int cicloTrabajoMinimo= 20;
+const int minCiclosEstacionario= 20;
 
 //Configuración de pines de salida para conexión con el Puente H
 const int PWMA = 10; //Control velocidad izquierdo
