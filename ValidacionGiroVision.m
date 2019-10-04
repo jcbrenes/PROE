@@ -82,8 +82,7 @@ for img= 1:CantidadEjemplosCaptura
     %Requiere la conversión de el espacio de color rgb que corresponde a 3
     %matrices, una del color rojo, una del verde y otra del azul a una sola
     %matriz en intensidad de grises.
-    Im1GRIS=rgb2gray(Im1);
-    Im1BN=im2bw(Im1GRIS,0.4);%0.6corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
+   
     Im2=imread(strcat('ejemplo',num2str(img),'(2).jpg'));
     %Leer la imagen a medir
     imOrig = Im1;
@@ -95,6 +94,10 @@ for img= 1:CantidadEjemplosCaptura
     %Los pasos anteriores corresponden a la eliminación de la distorsión de
     %la imagen, se utilizó los parámetros de calibración encontrados al
     %inicio.
+    Im1GRIS=rgb2gray(im);
+    Im1BN=im2bw(Im1GRIS,0.4);%0.6corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
+    
+    
     %De aquí en adelante se trabaja con im, que es la imagen con la distorsión
     %eliminada.
     [imagePoints, boardSize] = detectCheckerboardPoints(im);
@@ -110,7 +113,13 @@ for img= 1:CantidadEjemplosCaptura
     %imagen a unidades reales.
     mmPorPixel=mmCuadroPatron/pixelesCuadroPatron
     %ya se tiene almacenado la conversion correspondiente en mm/pixel
-    Im2GRIS=rgb2gray(Im2);
+    imOrig = Im2;
+
+    points = detectCheckerboardPoints(imOrig);
+    [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
+    [im, newOrigin] = undistortImage(imOrig, params, 'OutputView', 'full');
+    undistortedPoints = [undistortedPoints(:,1) - newOrigin(1), undistortedPoints(:,2) - newOrigin(2)];
+    Im2GRIS=rgb2gray(im);
     Im2BN=im2bw(Im2GRIS,0.4);
     ImSuperpuesta=Im1BN&Im2BN;
     %Se superponen las dos imágenes con  la segmentación del patrón
@@ -178,7 +187,7 @@ for img= 1:CantidadEjemplosCaptura
         anguloVector1=360+anguloVector1;
     end
     anguloVector2=atan2(vect2(2),vect2(1))*180/pi;
-    if(anguloVector1<=0)
+    if(anguloVector2<=0)
         anguloVector2=360+anguloVector2;
     end
     angulo = anguloVector2-anguloVector1
@@ -194,4 +203,5 @@ for img= 1:CantidadEjemplosCaptura
     result(cont,3)=separacion;
     cont=cont+1;
 end
+
 
