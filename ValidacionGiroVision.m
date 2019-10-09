@@ -182,26 +182,26 @@ for img= 1:CantidadEjemplosCaptura
     %Se requiere determinar el ángulo de separación entre la orientación
     %inicial y la orientación final, para esto, se referencian ambos
     %vectores respecto al eje horizontal de la imagen
-    anguloVector1=atan2(vect1(2),vect1(1))*180/pi;
-    if(anguloVector1<=0)
-        anguloVector1=360+anguloVector1;
+    citaInicial=atan2(vect1(2),vect1(1))*180/pi; %cita_inicial
+    if(citaInicial<=0)
+        citaInicial=360+citaInicial;
     end
-    anguloVector2=atan2(vect2(2),vect2(1))*180/pi;
-    if(anguloVector2<=0)
-        anguloVector2=360+anguloVector2;
+    citaFinal=atan2(vect2(2),vect2(1))*180/pi;%cita_final
+    if(citaFinal<=0)
+        citaFinal=360+citaFinal;
     end
-    angulo = anguloVector2-anguloVector1
-    
-    
-    distancia=norm((centroGrande(1,:)-centroGrande(2,:)));
-    %separacion=(distancia*(25/radioGrande(1,1)))
-    separacion=distancia*mmPorPixel
+    deltaCita = citaFinal-citaInicial%delta_cita es el error en la orientación
+    distancia=norm((centroGrande(1,:)-centroGrande(2,:))); %desplazamiento en pixeles del punto de partida y el punto final
+    r_exp=distancia*mmPorPixel %r_experimental es el desplazamiento en mm
+    deltaX=(centroGrande(1,2)-centroGrande(1,1))*mmPorPixel;%deltaX del desplazamiento experimental, con la imagen
+    deltaY=(centroGrande(2,2)-centroGrande(2,1))*mmPorPixel;%deltay del desplazamiento exp, con la imagen
+    betaExp=atan2(deltaY/deltaX)*180/pi;%angulo del desplazamiento experimental, referenciado con la imagen
+    betaTeorico=anguloVector1;% se rota el sistema para que coincida con el del agente
+    deltaBeta=betaExp-betaTeorico;%diferencia entre el desplazamiento teórico y el experimental
+    deltaX2=r_exp*cos(deltaBeta)*180/pi;%proyección x del r_exp sobre el desplazamiento teórico
+    deltaY2=r_exp*sin(deltaBeta)*180/pi;%proyección y del r_exp sobre el desplazamiento teórico
     %---Almacenamiento de resultados, la separación es en mm y el ángulo en
     %grados.
-    result(cont,1)=img;
-    result(cont,2)=angulo;
-    result(cont,3)=separacion;
+    result=strcat(num2str(deltaX2),';',num2str(deltaY2),';',num2str(deltaCita))
     cont=cont+1;
 end
-
-
