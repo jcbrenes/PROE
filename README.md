@@ -12,6 +12,6 @@ Contacto:
 Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
 
 Asistentes:
-Carlos Alonso Barrantes Jiménez carlosalonso.b.j@gmail.com
 Sebastián Barquero Meléndez sebas.barque@gmail.com
 Joselyn Murillo Rodríguez 
+Bryan Alpízar
