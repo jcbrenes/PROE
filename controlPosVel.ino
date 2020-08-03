@@ -7,7 +7,7 @@ const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
 const int factorEncoder=4; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
 const float circunferenciaRueda=139.5;//Circunferencia de la rueda = 139.5mm 
 const float pulsosPorMilimetro=((float)factorEncoder*pulsosPorRev)/circunferenciaRueda; 
-const float distanciaCentroARueda=65.0;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. Estaba a 65.75
+const float distanciaCentroARueda=87.5;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
 const float conversionMicroSaMin=1/(60 * 1000000);// factor de conversion microsegundo (unidades del tiempo muestreo) a minuto
 const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (unidades del tiempo muestreo) a segundo
 const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
@@ -34,12 +34,12 @@ const int cicloTrabajoMinimo= 20;
 const int minCiclosEstacionario= 20;
 
 //Configuración de pines de salida para conexión con el Puente H
-const int PWMA = 10; //Control velocidad izquierdo
-const int AIN1 = 11; //Dirección 1 rueda izquierda 
-const int AIN2 = 12; //Dirección 2 rueda izquierda 
-const int PWMB = 9;  //Control velocidad derecha
-const int BIN1 = 6;  //Dirección 1 rueda derecha
-const int BIN2 = 5;  //Dirección 2 rueda derecha
+const int PWMA = 12; //Control velocidad izquierdo
+const int AIN1 = 10; //Dirección 1 rueda izquierda 
+const int AIN2 = 1; //Dirección 2 rueda izquierda 
+const int PWMB = 5;  //Control velocidad derecha
+const int BIN1 = 9;  //Dirección 1 rueda derecha
+const int BIN2 = 6;  //Dirección 2 rueda derecha
 
 //Configuración de los pines para la conexión con los Encoders
 const int ENC_DER_C1 =  A0; //Encoders rueda derecha
