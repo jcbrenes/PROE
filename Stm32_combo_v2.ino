@@ -35,11 +35,11 @@ Servo myServo;
 
 //Constantes de configuración//
 const float beta=0.1;  //Constante para el filtro, ajustar para cambiar el comportamiento
-const int servoDelay=10; //Tiempo entre cada paso del servo en milisegundos
+const int servoDelay=20; //Tiempo entre cada paso del servo en milisegundos
 const float distanciaMinimaSharp=130; //Distancia mínima en milimetros para detección de obstáculos
 const int debounceTime=400; //Debounce para sensor IR frontal
-const float maxTemp=40; //Temperatura de detección de fuego
-const int movimientoMaximo=160; //Maxima rotacion en grados realizada por el servo que rota el sharp
+const float maxTemp=50; //Temperatura de detección de fuego
+const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el servo que rota el sharp
 
 //Variables globales//
 int angulo=0;
@@ -51,6 +51,9 @@ int sensorIRdetectado=0;
 unsigned long millisAnterior=0;
 int servoPos=0;
 int incremento=1; //cantidad de grados que aumenta el servo en cada movimiento
+bool ledON = false; 
+int onTime= 1000; //tiempo de encendido del LED en milisegundos
+unsigned long millisLED=0;
 
 
 void setup() {
@@ -82,11 +85,12 @@ void setup() {
 }
  
 void loop() {
-  //moverServo();
+  moverServo();
   revisarSharp();
   revisarSensoresIR();
   //revisarTemperatura(); //desactivado mientras no está soldado el sensor al PCB
-  //revisarBateria();
+  revisarBateria();
+  encenderLED(); //enciende un led si alguna función lo activó 
 }
 
 void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
@@ -98,6 +102,17 @@ void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
     if ((servoPos >= movimientoMaximo) || (servoPos <= 0)){ // se terminó el semiciclo, se invierte la dirección
       incremento = -incremento;
     }
+  }
+}
+
+void encenderLED(){ //Se encarga de encender el LED por un tiempo determinado. Se utiliza la función millis para evitar usar los delays
+  if(ledON){ //enciende el LED
+    digitalWrite(led3,HIGH); 
+    millisLED = millis();
+    ledON = false; 
+  }
+  if((millis() - millisLED) > onTime) {  //Se apaga el LED luego de un rato
+    digitalWrite(led3,LOW); 
   }
 }
 
@@ -125,8 +140,10 @@ void revisarTemperatura(){ //Lectura del sensor de temperatura
 void revisarBateria(){ //Revisar la batería cada 20 ciclos del loop, codigo 6
   if(digitalRead(lowBattery)){
     cuentaBateria++;
-    if(cuentaBateria>=2000){ //Si la bateria esta baja enviar advertencia cada 2000 ciclos del loop principal
-      enviarDato(6,0,0);
+    if(cuentaBateria>=10000){ //Si la bateria esta baja enviar advertencia cada 10000 ciclos del loop principal
+      //enviarDato(6,0,0);
+      ledON=true;
+      onTime=300;
       cuentaBateria=0;
     }
   }
@@ -139,19 +156,19 @@ void revisarSensoresIR(){ //Revisa si la variable de sensores IR cambio de estad
     case 0:    // no se ha detectado nada
       break;
     case 2:    // sensor IR frontal
-      Serial1.print("F ");
       enviarDato(2,0,0);
       sensorIRdetectado=0;
+      Serial1.print("F ");
       break;
     case 3:    // sensor IR inferior derecho
-      Serial1.print("R ");
       enviarDato(3,0,0);
       sensorIRdetectado=0;
+      Serial1.print("R ");
       break;
     case 4:    // sensor IR inferior izquierdo
-      Serial1.print("L ");
       enviarDato(4,0,0);
       sensorIRdetectado=0;
+      Serial1.print("L ");
       break;
   }
 }
@@ -162,10 +179,14 @@ void enviarDato(int caso, int distancia, int angulo){ //Envia el paquete de dato
   digitalWrite(int1,LOW);
   char dato[50];
   sprintf(dato, "%d,%d,%d.", caso, distancia, angulo); //Genera un string para la transmisión
-  Serial1.println(dato);
   Wire.beginTransmission(42);           //Comienza transmisión al esclavo 42 (Feather)
   Wire.write(dato);                     //Envia el valor al esclavo
   Wire.endTransmission();               //Detener la transmisión
+  //para visualización, enciende led y muestra el dato
+  ledON=true;
+  onTime=1000;
+  Serial1.println(dato);
+  
 }
 
 //Funciones de interrupción//
