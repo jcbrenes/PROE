@@ -1,6 +1,8 @@
 //Código principal para el proyecto PROE
 //https://github.com/jcbrenes/PROE
 
+#include<Wire.h> //Bilbioteca para la comunicacion I2C
+
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
 const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
@@ -12,18 +14,17 @@ const float conversionMicroSaMin=1/(60 * 1000000);// factor de conversion micros
 const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (unidades del tiempo muestreo) a segundo
 const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
-//constantes para control de velocidad
+//constantes para control PID de velocidad (están unidas con la constante de tiempo por simplificación de la ecuación)
 const float velRequerida=150; //unidades mm/s
 const float KpVel=2; //constante control proporcional
 const float KiVel=20.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
-//constantes para control de giro 
-//(ojo que estas constantes están unidas con la constante de tiempo por simplificación de la ecuación)
+//constantes para control PID de giro 
 const float KpGiro=2; //constante control proporcional
 const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
 const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
-//Constantes para las ecuaciones de control PID
+//Constantes para la implementación del control PID real
 const int errorMinIntegral=-250;
 const int errorMaxIntegral=250;
 const int limiteSuperiorCicloTrabajoVelocidad=200;
@@ -50,17 +51,20 @@ const int ENC_IZQ_C2 =  A3;
 //Configuracion de los pines de interrupcion de Obstáculos
 const int INT_OBSTACULO = A4;
 
-//Variables globales que se utilizan en el control de movimientos
+//Almacenamiento de datos de obstáculos
+const int longitudArregloObstaculos = 200;
+
+//VARIABLES GLOBALES
 
 //Variables para la máquina de estados principal
 enum PosiblesEstados {AVANCE=0, GIRE_DERECHA, GIRE_IZQUIERDA,ESCOGER_DIRECCION,GIRO, NADA};
 char *PosEstados[] = {"AVANCE", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
-PosiblesEstados estado = AVANCE;
+PosiblesEstados estado = NADA; //AVANCE;
 
 //variable que almacena el tiempo del último ciclo de muestreo
 long tiempoActual=0;
 
-//contadores de pulsos del encoder, muy importantes
+//contadores de pulsos del encoder
 int contPulsosDerecha=0;
 int contPulsosIzquierda=0;
 int contPulsosDerPasado=0;
@@ -105,6 +109,12 @@ bool direccionDerechaDisponible=1;
 int opcionGiro=0;// puede tener 3 valores, 1=Izquierda 2=Adelante, 3=Derecha
 bool asignarDireccionDeseada=0;
 
+//Variables para la comunicaciónI2C
+//TwoWire myWire(&sercom1, 11, 13);
+int datosSensores[longitudArregloObstaculos][3]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
+int ultimoObstaculo=-1; //Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
+
+
 void setup() {
   pinMode(PWMA, OUTPUT);
   pinMode(AIN1, OUTPUT);
@@ -113,18 +123,20 @@ void setup() {
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
   pinMode(INT_OBSTACULO, INPUT_PULLUP);
-  pinMode(13,OUTPUT);
+  pinMode(13,OUTPUT); //LED del feather
   attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
   attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
   attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
   attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
-  attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObjeto,FALLING);
+  //attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObjeto,FALLING);
   Serial.begin(9600);
-  tiempoActual=micros();
-  //Para el algoritmo de exploración
-  randomSeed(analogRead(A5));
-  delay(3000);
+  tiempoActual=micros(); //para temporización de los ciclos
+  randomSeed(analogRead(A5)); //Para el algoritmo de exploración
   //direccionDeseada=random(1,5);//asigna direccion N,S,E,O
+  Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
+  Wire.onReceive(recibirI2C);
+  //Wire.onRequest(requestEvent); // Se necesitan estas funciones porque el feather es el esclavo
+  delay(3000);
 }
 
 void loop(){
@@ -188,6 +200,53 @@ void loop(){
    
   }
  
+}
+
+void recibirI2C (int cantidad)  { 
+//Función (tipo Evento) llamada cuando se recibe algo en el puerto I2C conectado al STM32
+//Almacena en una matriz las variables de tipo de sensor, distancia y ángulo
+  int cont=1;
+  int tipoSensor=0;
+  int distancia=0;
+  int angulo=0;
+  String acumulado = "";
+  
+  while(0 < Wire.available()) { // ciclo mientras se reciben todos los datos
+    char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
+    if (c==','){ //los datos vienen separados por coma 
+      if (cont==1) {
+        tipoSensor = acumulado.toInt();
+        acumulado = "";
+      } 
+      if (cont==2) {
+        distancia = acumulado.toInt();
+        acumulado = "";
+      }
+      cont++;
+    }else if (c=='.') { //el ultimo dato viene con punto al final
+      angulo = acumulado.toInt();
+      acumulado = "";
+      cont=1;
+    } else {
+      acumulado += c;  //añade el caracter a la cadena anterior
+    }
+  }
+  
+  //Almacenamiento de datos en el arreglo de datos de los sensores
+  if (ultimoObstaculo == longitudArregloObstaculos-1){ //si llega al final del arreglo regresa al inicio, sino suma 1
+    ultimoObstaculo=0;
+  }else {
+    ultimoObstaculo++; 
+  }
+  datosSensores[ultimoObstaculo][0]= tipoSensor;
+  datosSensores[ultimoObstaculo][1]= distancia;
+  datosSensores[ultimoObstaculo][2]= angulo;
+  
+  Serial.print(datosSensores[ultimoObstaculo][0]);
+  Serial.print("  dist: ");
+  Serial.print(datosSensores[ultimoObstaculo][1]);
+  Serial.print("  ang: ");
+  Serial.println(datosSensores[ultimoObstaculo][2]);
 }
 
 void ReinicioEstadosDisponiblesGiro(){
