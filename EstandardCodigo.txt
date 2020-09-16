@@ -2,6 +2,7 @@ ESTANDARD DE CODIGO PROE
 Esta es una guía de formato para el código en C++ del proyecto PROE.
 Se solicita seguir esta guía para tener código que sea leible y entendible por otros. Además esto hace el proyecto más sostenible en 
 el tiempo.
+(Elaborado por JC Brenes)
 
 Variables:
 - El nombre inicia con minúscula
