@@ -1,5 +1,7 @@
+//Código de detección de obstáculos para el proyecto PROE
+//Usado en la placa Bluepill STM32
+//https://github.com/jcbrenes/PROE
 /*
-Código para STM32 de PROE v1
 Se encarga de la lectura de sensores y comunica cualquier evento mediante i2c al feather al que está conectado despues de notificarle mediante un pin adicional de interurpcion
 Se usa el formato "x,y,z." donde "x" es el código del evento, "y" es el valor de lectura si aplica y "z" el angulo en caso del sensor Sharp.
 Códigos de evento:
