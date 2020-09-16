@@ -1,3 +1,6 @@
+%****Herramienta de visión para validar movimientos de robots del proyecto PROE
+%****Usada sobre el programa Matlab
+
 %Este programa tiene como objetivo la estimación del ángulo de giro y la
 %separación entre los agentes utilizando un patrón visual como referencia
 %Requiere de la captura de dos imágenes, una antes del giro y otra
