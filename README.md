@@ -8,38 +8,38 @@ Este proyecto pretende diseñar un sistema multirobot físico para la exploraci�
 Los códigos computacionales, archivos CAD, diagramas eléctricos, esquemas de ensamblaje, lista de materiales y demás documentación acá presente representan el esfuerzo llevado acabo en este proyecto.
 
 Directorio de archivos:
-PROE_LOCOM -> archivo de la placa Feather M0 para Locomoción y Comunicación
-PROE_DETOB -> archivo de la placa Bluepill STM32 para Detección de Obstáculos
-PROE_COMBASE -> archivo de la placa Feather M0 usada como base para la comunicación
-Arquitectura_PROE-> archivo PDF de la arquitectura del sistema electrónico
-Corte_Chasis_PROE -> archivo PDF para corte láser del chasís 
-Corte_Obstaculos_PROE -> archivo PDF para corte láser de los obstáculos del escenario 
-PCB_Conexiones_PROE-> archivo PDF con la conexiones del PCB
-BOM_PROE -> archivo con la lista de materiales para el proyecto PROE
-EstandarCodigo -> Lineamientos para escritura de código en el proyecto
-Readme 
-LICENSE
+- PROE_LOCOM -> archivo de la placa Feather M0 para Locomoción y Comunicación
+- PROE_DETOB -> archivo de la placa Bluepill STM32 para Detección de Obstáculos
+- PROE_COMBASE -> archivo de la placa Feather M0 usada como base para la comunicación
+- Arquitectura_PROE-> archivo PDF de la arquitectura del sistema electrónico
+- Corte_Chasis_PROE -> archivo PDF para corte láser del chasís 
+- Corte_Obstaculos_PROE -> archivo PDF para corte láser de los obstáculos del escenario 
+- PCB_Conexiones_PROE-> archivo PDF con la conexiones del PCB
+- BOM_PROE -> archivo con la lista de materiales para el proyecto PROE
+- EstandarCodigo -> Lineamientos para escritura de código en el proyecto
+- Readme 
+- LICENSE
 
 Directorio de carpetas:
-Chasis: archivos CAD para corte láser del chasís
-Obstáculos: archivos CAD para corte láser de los obstáculos
-PCB: archivos Gerber para el PCB
-Herramientas: archivos para calibración y validación
-	Vision_Validacion -> herramienta de Matlab para validar giros y desplazamientos de un robot
-	Vision_Patron -> archivo PDF del patrón que debe aparecer en las imágenes para calibrar
-	Vision_Guia -> archivo PDF de la figura que debe ubicarse en cada robot para seguimiento
-	Calibracion_Motores -> archivo para correr en feather y calibrar los motores
+- Chasis: archivos CAD para corte láser del chasís
+- Obstáculos: archivos CAD para corte láser de los obstáculos
+- PCB: archivos Gerber para el PCB
+- Herramientas: archivos para calibración y validación
+	- Vision_Validacion -> herramienta de Matlab para validar giros y desplazamientos de un robot
+	- Vision_Patron -> archivo PDF del patrón que debe aparecer en las imágenes para calibrar
+	- Vision_Guia -> archivo PDF de la figura que debe ubicarse en cada robot para seguimiento
+	- Calibracion_Motores -> archivo para correr en feather y calibrar los motores
 	Calibración_Magnetómetro -> archivo para correr en feather y calibrar el magnetómetro
 
 
 Investigadores: 
-Cindy Calderón Arce ccalderon@itcr.ac.cr (Directora del proyecto)
-Rebeca Solís Ortega rsolis@itcr.ac.cr
-Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
+- Cindy Calderón Arce ccalderon@itcr.ac.cr (Directora del proyecto)
+- Rebeca Solís Ortega rsolis@itcr.ac.cr
+- Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
 
 Asistentes:
-Sebastián Barquero Meléndez sebas.barque@gmail.com
-Joselyn Murillo Rodríguez 
-Bryan Alpízar
-Kevin Morales Paz
-Andrés Jiménez
+- Sebastián Barquero Meléndez sebas.barque@gmail.com
+- Joselyn Murillo Rodríguez 
+- Bryan Alpízar
+- Kevin Morales Paz
+- Andrés Jiménez
