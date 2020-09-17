@@ -23,7 +23,7 @@ Directorio de archivos:
 Directorio de carpetas:
 - Chasis: archivos CAD para corte láser del chasís
 - Obstáculos: archivos CAD para corte láser de los obstáculos
-- PCB: archivos Gerber para el PCB
+- PCB: archivos CAD para diseño del PCB y archivos Gerber para manufactura del PCB
 - Herramientas: archivos para calibración y validación
 	- Vision_Validacion -> herramienta de Matlab para validar giros y desplazamientos de un robot
 	- Vision_Patron -> archivo PDF del patrón que debe aparecer en las imágenes para calibrar
