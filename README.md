@@ -39,7 +39,7 @@ Investigadores:
 
 Asistentes:
 - Sebastián Barquero Meléndez sebas.barque@gmail.com
-- Joselyn Murillo Rodríguez 
-- Bryan Alpízar
-- Kevin Morales Paz
-- Andrés Jiménez
+- Joselyn  
+- Bryan 
+- Kevin 
+- Andrés 
