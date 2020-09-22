@@ -53,14 +53,14 @@ const int ENC_IZQ_C2 =  A3;
 const int INT_OBSTACULO = A4;
 
 //Almacenamiento de datos de obstáculos
-const int longitudArregloObstaculos = 400;
+const int longitudArregloObstaculos = 1000;
 
 //VARIABLES GLOBALES
 
 //Variables para la máquina de estados principal
 enum PosiblesEstados {AVANCE=0, GIRE_DERECHA, GIRE_IZQUIERDA,ESCOGER_DIRECCION,GIRO, NADA};
 char *PosEstados[] = {"AVANCE", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
-PosiblesEstados estado = NADA; //AVANCE;
+PosiblesEstados estado = AVANCE;
 
 //variable que almacena el tiempo del último ciclo de muestreo
 long tiempoActual=0;
@@ -96,13 +96,12 @@ float sumErrorVelIzq=0;
 byte estadoEncoderDer=1; 
 byte estadoEncoderIzq=1;
 
-//Variables para el algoritmo de exploracion
+//**BORRAR**Variables para el algoritmo de exploracion
 bool giroAnteriorIzquierda=0;
 bool giroAnteriorDerecha=0;
 int direccionDeseada=1;//random(1,5);//asigna direccion N,S,E,O 
 int direccionActual=1; // 1=N, 2=E, 3=S, 4=O
-bool giroTerminado=1;
-bool detectaObjeto=0;
+bool atendiendoObstaculo=0;
 int anguloGiro = 90;
 bool direccionAdelanteDisponible=1;
 bool direccionIzquierdaDisponible=1;
@@ -110,13 +109,26 @@ bool direccionDerechaDisponible=1;
 int opcionGiro=0;// puede tener 3 valores, 1=Izquierda 2=Adelante, 3=Derecha
 bool asignarDireccionDeseada=0;
 
-//Variables para la comunicaciónI2C
-//TwoWire myWire(&sercom1, 11, 13);
-int datosSensores[longitudArregloObstaculos][3]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
-int ultimoObstaculo=-1; //Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
+//Variables para el algoritmo de exploración
+int unidadAvance= 100; //medida en mm que avanza cada robot por movimiento
+int distanciaAvanzada=0;
+int poseActual[3]={0,0,0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación.
+bool giroTerminado=1; //Se hace esta variable global para saber cuando se está en un giro y cuando no
+bool obstaculoAdelante=false;
+bool obstaculoDerecha=false;
+bool obstaculoIzquierda=false;
+
+enum orientacionesRobot {ADELANTE=0, DERECHA=90, IZQUIERDA=-90, ATRAS=180}; //Se definen las orientaciones de los robots, el número indica la orientación de la pose
+orientacionesRobot direccionGlobal = ADELANTE; //Se inicializa Adelante, pero en Setup se asignará un valor random
+
+//Variables para el almacenar datos de obstáculos
+int datosSensores[longitudArregloObstaculos][6]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
+int ultimoObstaculo=-1; //Apuntador al último obstáculo en el arreglo. Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
+
 
 
 void setup() {
+  //asignación de pines
   pinMode(PWMA, OUTPUT);
   pinMode(AIN1, OUTPUT);
   pinMode(AIN2, OUTPUT);
@@ -125,18 +137,20 @@ void setup() {
   pinMode(BIN2, OUTPUT);
   pinMode(INT_OBSTACULO, INPUT_PULLUP);
   pinMode(13,OUTPUT); //LED del feather
+  //asignación de interrupciones
   attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
   attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
   attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
   attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
-  //attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObjeto,FALLING);
-  Serial.begin(9600);
+  attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
+  //temporización y varibales aleatorias
   tiempoActual=micros(); //para temporización de los ciclos
-  randomSeed(analogRead(A5)); //Para el algoritmo de exploración
-  //direccionDeseada=random(1,5);//asigna direccion N,S,E,O
+  randomSeed(analogRead(A5)); //Para el algoritmo de exploración, el pinA5 está al aire
+  direccionGlobal= (orientacionesRobot)(random(-1,3)*90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
+  //Inicialización de puertos seriales
+  Serial.begin(9600);
   Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
-  Wire.onReceive(recibirI2C);
-  //Wire.onRequest(requestEvent); // Se necesitan estas funciones porque el feather es el esclavo
+  Wire.onReceive(RecibirI2C);
   delay(3000);
 }
 
@@ -149,61 +163,57 @@ void loop(){
      switch (estado) {
   
         case AVANCE:  { 
-          bool avanceTerminado= AvanzarDistancia(100); 
-          if (avanceTerminado || !digitalRead(INT_OBSTACULO)){
-            ConfiguracionParar(); //detiene el carro un momento
+          bool avanceTerminado= AvanzarDistancia(unidadAvance); 
+          if (avanceTerminado){
             estado = ESCOGER_DIRECCION; 
-          }
+          }        
           break; 
         }
+        
         case GIRE_DERECHA: { 
-          bool giroTerminado= Giro(90);
+          giroTerminado= Giro(90);
           if   (giroTerminado) {
             ConfiguracionParar(); //detiene el carro un momento
             estado = GIRE_IZQUIERDA;
           }
           break; 
         }
+        
         case GIRE_IZQUIERDA:  { 
-          bool giroTerminado= Giro(-90);
+          giroTerminado= Giro(-90);
           if   (giroTerminado) {
             ConfiguracionParar(); //detiene el carro un momento
             estado = GIRE_DERECHA;
           }        
           break; 
         }
+        
         case ESCOGER_DIRECCION: {
-          EscogerDireccion();
+          ActualizarUbicacion(); //Primero actualiza la ubicación actual en base al avance anterior y la orientación actual
+          ConfiguracionParar(); //detiene el carro un momento
+          RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
+          AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
           estado= GIRO;
         }
+        
         case GIRO: {
-          bool giroTerminado=Giro(anguloGiro);
+          giroTerminado=Giro(anguloGiro);
           if(giroTerminado){
+            digitalWrite(13,LOW);
             ConfiguracionParar();
-            if(digitalRead(INT_OBSTACULO)==1){// no hay un obstáculo, el giro es exitoso.
-              detectaObjeto=0;
-              if(asignarDireccionDeseada==1){
-                direccionDeseada=direccionActual;  
-                asignarDireccionDeseada=0;
-              }
-              estado=AVANCE;
-              ReinicioEstadosDisponiblesGiro();
-            }
-           else if(digitalRead(INT_OBSTACULO)==0){// hay un obstáculo, giro no es exitoso.
-             estado=ESCOGER_DIRECCION;
-           }
+            poseActual[2]==poseActual[2]+anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
+            estado=AVANCE;
           }
         }
+        
         case NADA: { 
           break; 
         }
      }
-   
   }
- 
 }
 
-void recibirI2C (int cantidad)  { 
+void RecibirI2C (int cantidad)  { 
 //Función (tipo Evento) llamada cuando se recibe algo en el puerto I2C conectado al STM32
 //Almacena en una matriz las variables de tipo de sensor, distancia y ángulo
   int cont=1;
@@ -239,15 +249,18 @@ void recibirI2C (int cantidad)  {
   }else {
     ultimoObstaculo++; 
   }
-  datosSensores[ultimoObstaculo][0]= tipoSensor;
-  datosSensores[ultimoObstaculo][1]= distancia;
-  datosSensores[ultimoObstaculo][2]= angulo;
+  datosSensores[ultimoObstaculo][0]= poseActual[0]; //Guarda la pose actual donde se detectó el obstáculo
+  datosSensores[ultimoObstaculo][1]= poseActual[1];
+  datosSensores[ultimoObstaculo][2]= poseActual[2];
+  datosSensores[ultimoObstaculo][3]= tipoSensor;
+  datosSensores[ultimoObstaculo][4]= distancia;
+  datosSensores[ultimoObstaculo][5]= angulo;
   
-  Serial.print(datosSensores[ultimoObstaculo][0]);
+  Serial.print(datosSensores[ultimoObstaculo][3]);
   Serial.print("  dist: ");
-  Serial.print(datosSensores[ultimoObstaculo][1]);
+  Serial.print(datosSensores[ultimoObstaculo][4]);
   Serial.print("  ang: ");
-  Serial.println(datosSensores[ultimoObstaculo][2]);
+  Serial.println(datosSensores[ultimoObstaculo][5]);
 }
 
 void ReinicioEstadosDisponiblesGiro(){
@@ -255,7 +268,6 @@ void ReinicioEstadosDisponiblesGiro(){
   direccionDerechaDisponible=1;
   direccionIzquierdaDisponible=1;
 }
-
 void AsignaDireccionSinObstaculo(){
   if(direccionActual==direccionDeseada){
           opcionGiro=random(1,4);// 1=izquierda 2=avanza 3=derecha
@@ -399,10 +411,45 @@ void AsignaDireccionConObstaculo(){
  }  
 }
 
+void ActualizarUbicacion(){
+//Función que actualiza la ubicación actual en base al avance anterior y la orientación actual
+  distanciaAvanzada= (int)calculaDistanciaLinealRecorrida();
+  if (poseActual[2]==0){ poseActual[1]= poseActual[1] + distanciaAvanzada;}
+  else if (poseActual[2]==90) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
+  else if (poseActual[2]==-90) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
+  else if (abs(poseActual[2])==180) { poseActual[1] = poseActual[1] - distanciaAvanzada;}
+}
 
+void RevisaObstaculoPeriferia(){
+//Función que revisa los obstáculos detectados previamente y determina cuales están en la periferia actual
+//Retorna una simplificación de si hay ostáculo adelante, a la derecha o atrás
 
-void EscogerDireccion(){
+  for (int i=0; i<=ultimoObstaculo; i++){
+    //Busca si  la pose actual calza con la pose cuando se detectó el obstáculo. Uso un margen de tolerancia para la detección
+    if ( (abs(poseActual[0]-datosSensores[i][0]) < unidadAvance) && 
+         (abs(poseActual[1]-datosSensores[i][1]) < unidadAvance) && 
+          datosSensores[i][2]==poseActual[2]){
+            
+        //Evalua el ángulo del obstáculo y lo simplifica a si hay obstáculo adelante, a la derecha o a la izquierda
+        if (datosSensores[i][5] >= -45 && datosSensores[i][5] <= 45) {obstaculoAdelante=true;}
+        if (datosSensores[i][5] > 55 && datosSensores[i][5] < 95) {obstaculoDerecha=true;}
+        if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {obstaculoIzquierda=true;}
+      
+    }
+  }
+}
 
+void AsignarDireccionRWD(){
+//Función que escoge la dirección de giro para el robot en base al algoritmo Random Walk con Dirección
+//Actualiza la variable global anguloGiro
+
+    //Asigna dirección random en base a Rand Walk y obstáculos presentes
+
+    //Reset de la simplificación sobre obstáculo en la pose actual
+    obstaculoAdelante=false;
+    obstaculoDerecha=false;
+    obstaculoIzquierda=false;    
+    
     if(digitalRead(INT_OBSTACULO)==0){//hay un obstaculo frente
       //Si hay obstaculo opcionGiro se limita a 1=Izquierda,3=Derecha,5=Giro180
       //Utiliza las memorias de direccion Disponible, las cuales al avanzar regresan a 1.
@@ -432,6 +479,7 @@ void EscogerDireccion(){
         else {direccionActual++;}
         anguloGiro=-90;
         break;
+       
        case 4:
         anguloGiro=180;
         direccionActual=direccionDeseada+2;
@@ -444,55 +492,15 @@ void EscogerDireccion(){
       default:
         break;
     }
- 
-      if(direccionActual==1){
-    Serial.print("^");
-   }
-    if(direccionActual==2){
-    Serial.print(">");
-   }
-    if(direccionActual==3){
-    Serial.print("v");
-   }
-    if(direccionActual==4){
-    Serial.print("<");
-   }
-   Serial.print(" ");
-      if(direccionDeseada==1){
-    Serial.print("^");
-   }
-   if(direccionDeseada==2){
-    Serial.print(">");
-   }
-    if(direccionDeseada==3){
-    Serial.print("v");
-   }
-    if(direccionDeseada==4){
-    Serial.print("<");
-   }
-    Serial.print("   ");
-    if(direccionIzquierdaDisponible==1){
-      Serial.print("<");
-    }
-   
-    if(direccionIzquierdaDisponible==0){Serial.print("*");}
-    if(direccionAdelanteDisponible==1){
-      Serial.print("^");
-    }
-    if(direccionAdelanteDisponible==0){Serial.print("*");}
-    if(direccionDerechaDisponible==1){
-      Serial.println(">");
-    }
-     if(direccionDerechaDisponible==0){Serial.println("*");}
-     giroTerminado=0;
 }
 
-void DeteccionObjeto(){
-  if(detectaObjeto==0 && giroTerminado==1){
-   detectaObjeto=1;
+void DeteccionObstaculo(){
+//Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
+//Son obstáculos que requieren que el robot cambie de dirección
+
+  if(giroTerminado==1){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
    Serial.println("OBJETO!!");
    digitalWrite(13,HIGH);
-   ConfiguracionParar();
    estado=ESCOGER_DIRECCION;
   } 
    
