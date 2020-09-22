@@ -8,9 +8,6 @@ Este proyecto pretende diseñar un sistema multirobot físico para la exploraci�
 Los códigos computacionales, archivos CAD, diagramas eléctricos, esquemas de ensamblaje, lista de materiales y demás documentación acá presente representan el esfuerzo llevado acabo en este proyecto.
 
 Directorio de archivos:
-- PROE_LOCOM -> archivo de la placa Feather M0 para Locomoción y Comunicación
-- PROE_DETOB -> archivo de la placa Bluepill STM32 para Detección de Obstáculos
-- PROE_COMBASE -> archivo de la placa Feather M0 usada como base para la comunicación
 - Arquitectura_PROE-> archivo PDF de la arquitectura del sistema electrónico
 - Corte_Chasis_PROE -> archivo PDF para corte láser del chasís 
 - Corte_Obstaculos_PROE -> archivo PDF para corte láser de los obstáculos del escenario 
@@ -21,6 +18,9 @@ Directorio de archivos:
 - LICENSE
 
 Directorio de carpetas:
+- PROE_LOCOM -> Proyecto en Arduino IDE (placa Feather M0) para Locomoción y Comunicación
+- PROE_DETOB -> Proyecto en Arduino IDE (placa Bluepill STM32) para Detección de Obstáculos
+- PROE_COMBASE -> Proyecto en Arduino IDE (placa Feather M0) dispositivo usado como base para la comunicación
 - Chasis: archivos CAD para corte láser del chasís
 - Obstáculos: archivos CAD para corte láser de los obstáculos
 - PCB: archivos CAD para diseño del PCB y archivos Gerber para manufactura del PCB
