@@ -1,3 +1,7 @@
+//Código de calibración de los motores del robot para el proyecto PROE
+//Usado en una placa Feather M0 RFM95
+//https://github.com/jcbrenes/PROE
+
 //Este código se utiliza para calibrar 2 motores DC
 //Da como resultado valores númericos de calibración que deben ser apuntados e implementados en el código principal
 //La "condición" mencionada se refiere a que el PWM que se calibre no debe exceder los 255
