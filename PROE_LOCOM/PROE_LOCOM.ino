@@ -96,18 +96,9 @@ float sumErrorVelIzq=0;
 byte estadoEncoderDer=1; 
 byte estadoEncoderIzq=1;
 
-//**BORRAR**Variables para el algoritmo de exploracion
-bool giroAnteriorIzquierda=0;
-bool giroAnteriorDerecha=0;
-int direccionDeseada=1;//random(1,5);//asigna direccion N,S,E,O 
-int direccionActual=1; // 1=N, 2=E, 3=S, 4=O
-bool atendiendoObstaculo=0;
-int anguloGiro = 90;
-bool direccionAdelanteDisponible=1;
-bool direccionIzquierdaDisponible=1;
-bool direccionDerechaDisponible=1;
-int opcionGiro=0;// puede tener 3 valores, 1=Izquierda 2=Adelante, 3=Derecha
-bool asignarDireccionDeseada=0;
+//Variables para el almacenar datos de obstáculos
+int datosSensores[longitudArregloObstaculos][6]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
+int ultimoObstaculo=-1; //Apuntador al último obstáculo en el arreglo. Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
 
 //Variables para el algoritmo de exploración
 int unidadAvance= 100; //medida en mm que avanza cada robot por movimiento
@@ -117,15 +108,9 @@ bool giroTerminado=1; //Se hace esta variable global para saber cuando se está 
 bool obstaculoAdelante=false;
 bool obstaculoDerecha=false;
 bool obstaculoIzquierda=false;
-
 enum orientacionesRobot {ADELANTE=0, DERECHA=90, IZQUIERDA=-90, ATRAS=180}; //Se definen las orientaciones de los robots, el número indica la orientación de la pose
 orientacionesRobot direccionGlobal = ADELANTE; //Se inicializa Adelante, pero en Setup se asignará un valor random
-
-//Variables para el almacenar datos de obstáculos
-int datosSensores[longitudArregloObstaculos][6]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
-int ultimoObstaculo=-1; //Apuntador al último obstáculo en el arreglo. Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
-
-
+int anguloGiro = 0;
 
 void setup() {
   //asignación de pines
@@ -263,153 +248,6 @@ void RecibirI2C (int cantidad)  {
   Serial.println(datosSensores[ultimoObstaculo][5]);
 }
 
-void ReinicioEstadosDisponiblesGiro(){
-  direccionAdelanteDisponible=1;
-  direccionDerechaDisponible=1;
-  direccionIzquierdaDisponible=1;
-}
-void AsignaDireccionSinObstaculo(){
-  if(direccionActual==direccionDeseada){
-          opcionGiro=random(1,4);// 1=izquierda 2=avanza 3=derecha
-  }
-  else if(direccionActual!=direccionDeseada){
-    if(abs(direccionActual-direccionDeseada)==2){//completamente en la direccion opuesta
-      opcionGiro=4;
-    }
-    else if(giroAnteriorIzquierda==1){
-      opcionGiro=random(2,4);//gire derecha o adelante
-    }
-    else if(giroAnteriorDerecha==1){
-      opcionGiro=random(1,3);//gire izquierda o adelante
-    }
-    else if(giroAnteriorDerecha==0 && giroAnteriorIzquierda==0){
-      //Asume que siempre se coloca en direccion Norte
-      if(direccionDeseada==2){//si la deseada es  Este
-        opcionGiro=3; //Gire a la izquierda
-      }
-      if(direccionDeseada==4){//si la deseada es Oeste
-        opcionGiro=1;//gire a la derecha
-      }
-    }
-  }
-
-
-}
-void AsignaDireccionConObstaculo(){
-  if(direccionActual==direccionDeseada){
-      direccionAdelanteDisponible=0;
-      asignarDireccionDeseada=1;
-      if(direccionDerechaDisponible==1 && direccionIzquierdaDisponible==1){
-        opcionGiro=random(1,3);//si es 1, gire izquierda
-        if(opcionGiro==1){
-        }
-        if(opcionGiro==2){//sino, gire derecha
-          opcionGiro=3;
-        }
-      }
-      else if(direccionDerechaDisponible==0 && direccionIzquierdaDisponible==1){
-        opcionGiro=1;
-      }
-      else if(direccionDerechaDisponible==1 && direccionIzquierdaDisponible==0){
-        opcionGiro=3;
-      }
-      else if(direccionDerechaDisponible==0 && direccionIzquierdaDisponible==0 && direccionAdelanteDisponible==0){
-        opcionGiro=4;
-      }
-             
-  }
-  else if( direccionActual!=direccionDeseada){
-    if(direccionAdelanteDisponible==1){
-    switch(direccionDeseada){
-        case 1:
-          if(direccionActual==4){
-             opcionGiro=3;
-          }
-          if(direccionActual==2){
-            opcionGiro=1;
-          }
-          break;
-        case 4:
-          if(direccionActual==1){
-            opcionGiro=1;
-          }
-          if(direccionActual==3){
-            opcionGiro=3;
-          }
-          break;
-         case 2:
-          if(direccionActual==1){
-            opcionGiro=3;
-          }
-          if(direccionActual==3){
-            opcionGiro=1;
-          }
-          break;
-          case 3:
-          if(direccionActual==2){
-            opcionGiro=3;
-           }
-          if(direccionActual==4){
-            opcionGiro=1;
-           }
-          break;
-         default:
-          break;
-      }
-      if(opcionGiro==1){
-        direccionDerechaDisponible=0;
-      }
-      if(opcionGiro==3){
-        direccionIzquierdaDisponible=0;
-      }
-    
-  }
-  else if(direccionAdelanteDisponible==0 && (direccionDerechaDisponible==1 || direccionIzquierdaDisponible==1)){
-    opcionGiro=4;
-    if(giroAnteriorDerecha==1){direccionIzquierdaDisponible=0;}
-    if(giroAnteriorIzquierda==1){direccionDerechaDisponible=0;}
-  }
-  else{
-   
-    switch(direccionDeseada){
-        case 1:
-          if(direccionActual==4){
-             opcionGiro=1;
-          }
-          if(direccionActual==2){
-            opcionGiro=3;
-          }
-          break;
-        case 4:
-          if(direccionActual==1){
-            opcionGiro=3;
-          }
-          if(direccionActual==3){
-            opcionGiro=1;
-          }
-          break;
-         case 2:
-          if(direccionActual==1){
-            opcionGiro=1;
-          }
-          if(direccionActual==3){
-            opcionGiro=3;
-          }
-          break;
-          case 3:
-          if(direccionActual==2){
-            opcionGiro=1;
-           }
-          if(direccionActual==4){
-            opcionGiro=3;
-           }
-          break;
-         default:
-          break;
-      }
-  }
- }  
-}
 
 void ActualizarUbicacion(){
 //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual
@@ -433,8 +271,7 @@ void RevisaObstaculoPeriferia(){
         //Evalua el ángulo del obstáculo y lo simplifica a si hay obstáculo adelante, a la derecha o a la izquierda
         if (datosSensores[i][5] >= -45 && datosSensores[i][5] <= 45) {obstaculoAdelante=true;}
         if (datosSensores[i][5] > 55 && datosSensores[i][5] < 95) {obstaculoDerecha=true;}
-        if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {obstaculoIzquierda=true;}
-      
+        if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {obstaculoIzquierda=true;}    
     }
   }
 }
@@ -444,54 +281,30 @@ void AsignarDireccionRWD(){
 //Actualiza la variable global anguloGiro
 
     //Asigna dirección random en base a Rand Walk y obstáculos presentes
+    int diferenciaOrientacion = poseActual[2] - (int)direccionGlobal;
+    int minRandom = 0;
+    int maxRandom = 3;
+    int incrementoPosible = 90;
 
+    //Si hay un obstáculo o se está en una orientación diferente a la global, se restringen las opciones del aleatorio
+    if (obstaculoIzquierda || diferenciaOrientacion == -90){ minRandom++; }
+    if (obstaculoDerecha || diferenciaOrientacion == 90){ maxRandom--; }
+    if (obstaculoAdelante || abs(diferenciaOrientacion)==180){
+      incrementoPosible=180; //Un obstáculo adelante es un caso especial que implica girar a la derecha o izquierda (diferencia de 180°)
+      maxRandom--;
+    }
+
+    if (maxRandom<minRandom){ //Si se da este caso, representa que no hay opciones ni adelante, ni izquierda, ni derecha
+      anguloGiro=180;
+    }else{
+      //La ecuación del ángulo de giro toma en cuenta todas las restricciones anteriores y lo pasa a escala de grados (nomenclatura de orientación)
+      anguloGiro = random(minRandom,maxRandom)*incrementoPosible-90;
+    }
+    
     //Reset de la simplificación sobre obstáculo en la pose actual
     obstaculoAdelante=false;
     obstaculoDerecha=false;
     obstaculoIzquierda=false;    
-    
-    if(digitalRead(INT_OBSTACULO)==0){//hay un obstaculo frente
-      //Si hay obstaculo opcionGiro se limita a 1=Izquierda,3=Derecha,5=Giro180
-      //Utiliza las memorias de direccion Disponible, las cuales al avanzar regresan a 1.
-      AsignaDireccionConObstaculo();
-     }
-    else if(digitalRead(INT_OBSTACULO)==1){//Si no hay obstaculo
-      AsignaDireccionSinObstaculo();
-    }
-    switch (opcionGiro){
-      case 1://izquierda
-        giroAnteriorIzquierda=1;
-        giroAnteriorDerecha=0;
-        if(direccionActual==1) {direccionActual=4;}
-        else {direccionActual--;}
-        anguloGiro=90;
-        break;
-    
-      case 2: //Adelante
-        direccionActual=direccionActual;
-        anguloGiro=0;
-        break;
-
-      case 3://derecha
-        giroAnteriorDerecha=1;
-        giroAnteriorIzquierda=0;
-        if(direccionActual==4){direccionActual=1;}
-        else {direccionActual++;}
-        anguloGiro=-90;
-        break;
-       
-       case 4:
-        anguloGiro=180;
-        direccionActual=direccionDeseada+2;
-        if(direccionActual==5){direccionActual=1;}
-        if(direccionActual==6){direccionActual=2;}
-        direccionDeseada=direccionActual;
-        giroAnteriorDerecha=0;
-        giroAnteriorIzquierda=0;
-        break;   
-      default:
-        break;
-    }
 }
 
 void DeteccionObstaculo(){
