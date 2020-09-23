@@ -248,6 +248,16 @@ void RecibirI2C (int cantidad)  {
   Serial.println(datosSensores[ultimoObstaculo][5]);
 }
 
+void DeteccionObstaculo(){
+//Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
+//Son obstáculos que requieren que el robot cambie de dirección
+
+  if(giroTerminado==1){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
+   Serial.println("OBJETO!!");
+   digitalWrite(13,HIGH);
+   estado=ESCOGER_DIRECCION;
+  }   
+}
 
 void ActualizarUbicacion(){
 //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual
@@ -308,17 +318,7 @@ void AsignarDireccionRWD(){
     obstaculoIzquierda=false;    
 }
 
-void DeteccionObstaculo(){
-//Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
-//Son obstáculos que requieren que el robot cambie de dirección
 
-  if(giroTerminado==1){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
-   Serial.println("OBJETO!!");
-   digitalWrite(13,HIGH);
-   estado=ESCOGER_DIRECCION;
-  } 
-   
-}
 
 
 bool Giro(float grados){
