@@ -53,7 +53,7 @@ const int ENC_IZQ_C2 =  A3;
 const int INT_OBSTACULO = A4;
 
 //Almacenamiento de datos de obstáculos
-const int longitudArregloObstaculos = 1000;
+const int longitudArregloObstaculos = 900;
 
 //VARIABLES GLOBALES
 
