@@ -29,7 +29,7 @@ Directorio de carpetas:
 	- Vision_Patron -> archivo PDF del patrón que debe aparecer en las imágenes para calibrar
 	- Vision_Guia -> archivo PDF de la figura que debe ubicarse en cada robot para seguimiento
 	- Calibracion_Motores -> archivo para correr en feather y calibrar los motores
-	Calibración_Magnetómetro -> archivo para correr en feather y calibrar el magnetómetro
+	- Calibración_Magnetómetro -> archivo para correr en feather y calibrar el magnetómetro
 
 
 Investigadores: 
