@@ -1,0 +1,1 @@
+Archivos de Autocad con el diseño del chasís del robot del proyecto PROE. Para ser usado en corte láser con laminas de acrílico de 6mm.
