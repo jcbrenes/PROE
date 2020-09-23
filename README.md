@@ -40,6 +40,6 @@ Investigadores:
 Asistentes:
 - Sebastián Barquero Meléndez sebas.barque@gmail.com
 - Joselyn  
-- Bryan 
+- Bryan Alpízar Quesada bryan2300@gmail.com
 - Kevin 
 - Andrés 
