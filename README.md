@@ -41,5 +41,5 @@ Asistentes:
 - Sebastián Barquero Meléndez sebas.barque@gmail.com
 - Joselyn  
 - Bryan 
-- Kevin 
+- Kevin Morales Paz kevinmoralespaz@gmail.com
 - Andrés 
