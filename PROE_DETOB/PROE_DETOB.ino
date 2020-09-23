@@ -37,7 +37,7 @@ Servo myServo;
 
 //Constantes de configuración//
 const float beta=0.1;  //Constante para el filtro, ajustar para cambiar el comportamiento
-const int servoDelay=20; //Tiempo entre cada paso del servo en milisegundos
+const int servoDelay=10; //Tiempo entre cada paso del servo en milisegundos
 const float distanciaMinimaSharp=130; //Distancia mínima en milimetros para detección de obstáculos
 const int debounceTime=400; //Debounce para sensor IR frontal
 const float maxTemp=50; //Temperatura de detección de fuego
@@ -45,6 +45,7 @@ const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el ser
 
 //Variables globales//
 int angulo=0;
+int anguloAnterior=0;
 int lectura=0;
 float distancia=0;
 float filtrado=0;
@@ -122,9 +123,10 @@ void revisarSharp(){ //Revisa el valor del sensor Sharp
     lectura=analogRead(sharp);
     filtrado=filtrado-(beta*(filtrado-lectura)); //Filtro de media movil
     distancia=1274160*pow(filtrado,-1.174); //Regresión lineal de datos experimentales para obtener distancia en milimetros
-    if (distancia<distanciaMinimaSharp){
+    if ((distancia<distanciaMinimaSharp) & (angulo!=anguloAnterior)){ //revisa distancia umbral y que solo se haga un envío por cada ángulo
       enviarDato(1,int(distancia),angulo); //Enviar obstaculo tipo 1 con distancia en cm y angulo
     }
+    anguloAnterior=angulo;
 }
 
 void revisarTemperatura(){ //Lectura del sensor de temperatura
@@ -176,9 +178,14 @@ void revisarSensoresIR(){ //Revisa si la variable de sensores IR cambio de estad
 }
 
 void enviarDato(int caso, int distancia, int angulo){ //Envia el paquete de datos con la información de obstaculo detectado
-  digitalWrite(int1,HIGH); //Pulsar salida int1 para indicarle al feather que se detectó un obstaculo y luego enviar los detalles
-  delay(2); //Delay para darle tiempo al feather de que llegue a la interrupcion y se ponga a leer el i2c, puede que no sea necesario
-  digitalWrite(int1,LOW);
+
+  //Solo si el obstáculo está en frente activa el pin de interrupción para el feather
+  if (abs(angulo)<=45){
+    digitalWrite(int1,HIGH); //Pulsar salida int1 para indicarle al feather que se detectó un obstaculo y luego enviar los detalles
+    delay(2); //Delay para darle tiempo al feather de que llegue a la interrupcion y se ponga a leer el i2c, puede que no sea necesario
+    digitalWrite(int1,LOW);  
+  }
+
   char dato[50];
   sprintf(dato, "%d,%d,%d.", caso, distancia, angulo); //Genera un string para la transmisión
   Wire.beginTransmission(42);           //Comienza transmisión al esclavo 42 (Feather)

@@ -296,6 +296,10 @@ void AsignarDireccionRWD(){
     int maxRandom = 3;
     int incrementoPosible = 90;
 
+    //En esta condición especial se asigna una nueva dirección global
+    if (obstaculoAdelante || diferenciaOrientacion==0){ 
+      direccionGlobal= (orientacionesRobot)(random(-1,3)*90); 
+    }
     //Si hay un obstáculo o se está en una orientación diferente a la global, se restringen las opciones del aleatorio
     if (obstaculoIzquierda || diferenciaOrientacion == -90){ minRandom++; }
     if (obstaculoDerecha || diferenciaOrientacion == 90){ maxRandom--; }
@@ -303,10 +307,11 @@ void AsignarDireccionRWD(){
       incrementoPosible=180; //Un obstáculo adelante es un caso especial que implica girar a la derecha o izquierda (diferencia de 180°)
       maxRandom--;
     }
-
+    
     if (maxRandom<minRandom){ 
-      //Si se da este caso, representa que no hay opciones ni adelante, ni izquierda, ni derecha
+      //Si se da este caso, representa que no hay opciones ni adelante, ni izquierda, ni derecha. 
       anguloGiro=180;
+      direccionGlobal= (orientacionesRobot)(random(-1,3)*90); 
     }else{
       //La ecuación del ángulo de giro toma en cuenta todas las restricciones anteriores y lo pasa a escala de grados (nomenclatura de orientación)
       anguloGiro = random(minRandom,maxRandom)*incrementoPosible-90;
@@ -317,8 +322,6 @@ void AsignarDireccionRWD(){
     obstaculoDerecha=false;
     obstaculoIzquierda=false;    
 }
-
-
 
 
 bool Giro(float grados){
