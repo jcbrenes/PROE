@@ -294,7 +294,8 @@ void AsignarDireccionRWD(){
       maxRandom--;
     }
 
-    if (maxRandom<minRandom){ //Si se da este caso, representa que no hay opciones ni adelante, ni izquierda, ni derecha
+    if (maxRandom<minRandom){ 
+      //Si se da este caso, representa que no hay opciones ni adelante, ni izquierda, ni derecha
       anguloGiro=180;
     }else{
       //La ecuación del ángulo de giro toma en cuenta todas las restricciones anteriores y lo pasa a escala de grados (nomenclatura de orientación)
