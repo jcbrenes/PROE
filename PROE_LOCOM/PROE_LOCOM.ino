@@ -53,7 +53,10 @@ const int ENC_IZQ_C2 =  A3;
 const int INT_OBSTACULO = A4;
 
 //Almacenamiento de datos de obstáculos
-const int longitudArregloObstaculos = 900;
+const int longitudArregloObstaculos = 1000;
+
+//Constantes algoritmo exploración
+int unidadAvance= 200; //medida en mm que avanza cada robot por movimiento
 
 //VARIABLES GLOBALES
 
@@ -101,7 +104,6 @@ int datosSensores[longitudArregloObstaculos][6]; //Arreglo que almacena la infor
 int ultimoObstaculo=-1; //Apuntador al último obstáculo en el arreglo. Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
 
 //Variables para el algoritmo de exploración
-int unidadAvance= 100; //medida en mm que avanza cada robot por movimiento
 int distanciaAvanzada=0;
 int poseActual[3]={0,0,0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación.
 bool giroTerminado=1; //Se hace esta variable global para saber cuando se está en un giro y cuando no
@@ -133,7 +135,7 @@ void setup() {
   randomSeed(analogRead(A5)); //Para el algoritmo de exploración, el pinA5 está al aire
   direccionGlobal= (orientacionesRobot)(random(-1,3)*90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
   //Inicialización de puertos seriales
-  Serial.begin(9600);
+  Serial.begin(115200);
   Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
   Wire.onReceive(RecibirI2C);
   delay(3000);
@@ -332,9 +334,9 @@ bool Giro(float grados){
     posActualRuedaIzquierda= ConvDistAngular(contPulsosIzquierda);
     int cicloTrabajoRuedaIzquierda = ControlPosGiroRueda( -grados, -posActualRuedaIzquierda, sumErrorGiroIzq, errorAnteriorGiroIzq);
     
-    Serial.print(cicloTrabajoRuedaDerecha);
-    Serial.print(",");
-    Serial.println(cicloTrabajoRuedaIzquierda);
+//    Serial.print(cicloTrabajoRuedaDerecha);
+//    Serial.print(",");
+//    Serial.println(cicloTrabajoRuedaIzquierda);
   
     ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
 
@@ -565,15 +567,15 @@ bool AvanzarDistancia(int distanciaDeseada){
   velActualIzquierda= -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
   int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(velRequerida, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
    
-    Serial.print("Vel der: ");
-    Serial.print(velActualDerecha,5);
-    Serial.print(" ; Vel izq: ");
-    Serial.println(velActualIzquierda,5);
-
-    Serial.print("PWM der: ");
-    Serial.print(cicloTrabajoRuedaDerecha);
-    Serial.print(" ; PWM izq: ");
-    Serial.println(cicloTrabajoRuedaIzquierda);
+//    Serial.print("Vel der: ");
+//    Serial.print(velActualDerecha,5);
+//    Serial.print(" ; Vel izq: ");
+//    Serial.println(velActualIzquierda,5);
+//
+//    Serial.print("PWM der: ");
+//    Serial.print(cicloTrabajoRuedaDerecha);
+//    Serial.print(" ; PWM izq: ");
+//    Serial.println(cicloTrabajoRuedaIzquierda);
   
   ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
 
