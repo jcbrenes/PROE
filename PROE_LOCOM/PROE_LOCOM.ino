@@ -21,7 +21,7 @@ const float KpVel=2; //constante control proporcional
 const float KiVel=20.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
 //constantes para control PID de giro 
-const float KpGiro=2; //constante control proporcional
+const float KpGiro=1.8; //constante control proporcional
 const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
 const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
