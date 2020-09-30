@@ -242,12 +242,6 @@ void RecibirI2C (int cantidad)  {
   datosSensores[ultimoObstaculo][3]= tipoSensor;
   datosSensores[ultimoObstaculo][4]= distancia;
   datosSensores[ultimoObstaculo][5]= angulo;
-  
-  Serial.print(datosSensores[ultimoObstaculo][3]);
-  Serial.print("  dist: ");
-  Serial.print(datosSensores[ultimoObstaculo][4]);
-  Serial.print("  ang: ");
-  Serial.println(datosSensores[ultimoObstaculo][5]);
 }
 
 void DeteccionObstaculo(){
@@ -255,8 +249,15 @@ void DeteccionObstaculo(){
 //Son obstáculos que requieren que el robot cambie de dirección
 
   if(giroTerminado==1){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
-   Serial.println("OBJETO!!");
+   Serial.println("INT OBS!!");
    digitalWrite(13,HIGH);
+   delay(10);
+   Serial.print(datosSensores[ultimoObstaculo][3]);
+    Serial.print("  dist: ");
+    Serial.print(datosSensores[ultimoObstaculo][4]);
+    Serial.print("  ang: ");
+    Serial.println(datosSensores[ultimoObstaculo][5]);
+    delay(10);
    estado=ESCOGER_DIRECCION;
   }   
 }
@@ -268,14 +269,13 @@ void ActualizarUbicacion(){
   else if (poseActual[2]==90 || poseActual[2]==-270) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
   else if (poseActual[2]==-90 || poseActual[2]==270) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
   else if (abs(poseActual[2])==180) { poseActual[1] = poseActual[1] - distanciaAvanzada;}
-  Serial.print("Dist: ");
-  Serial.print(distanciaAvanzada);
   Serial.print("   Pose =>  X: ");
   Serial.print(poseActual[0]);
   Serial.print("  Y: ");
   Serial.print(poseActual[1]);
   Serial.print("  Theta: ");
   Serial.println(poseActual[2]);
+  delay(10);
 }
 
 void RevisaObstaculoPeriferia(){
@@ -291,7 +291,7 @@ void RevisaObstaculoPeriferia(){
         //Evalua el ángulo del obstáculo y lo simplifica a si hay obstáculo adelante, a la derecha o a la izquierda
         if (datosSensores[i][5] >= -45 && datosSensores[i][5] <= 45) {obstaculoAdelante=true;}
         if (datosSensores[i][5] > 55 && datosSensores[i][5] < 95) {obstaculoDerecha=true;}
-        if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {obstaculoIzquierda=true;}    
+        if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {obstaculoIzquierda=true;} 
     }
   }
 }
