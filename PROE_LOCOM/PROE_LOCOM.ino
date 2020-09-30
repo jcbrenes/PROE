@@ -249,15 +249,14 @@ void DeteccionObstaculo(){
 //Son obstáculos que requieren que el robot cambie de dirección
 
   if(giroTerminado==1){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
-   Serial.println("INT OBS!!");
    digitalWrite(13,HIGH);
-   delay(10);
+   Serial.println("INT OBS!!");
    Serial.print(datosSensores[ultimoObstaculo][3]);
-    Serial.print("  dist: ");
-    Serial.print(datosSensores[ultimoObstaculo][4]);
-    Serial.print("  ang: ");
-    Serial.println(datosSensores[ultimoObstaculo][5]);
-    delay(10);
+   Serial.print("  dist: ");
+   Serial.print(datosSensores[ultimoObstaculo][4]);
+   Serial.print("  ang: ");
+   Serial.println(datosSensores[ultimoObstaculo][5]);
+   delay(10);
    estado=ESCOGER_DIRECCION;
   }   
 }
@@ -269,7 +268,7 @@ void ActualizarUbicacion(){
   else if (poseActual[2]==90 || poseActual[2]==-270) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
   else if (poseActual[2]==-90 || poseActual[2]==270) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
   else if (abs(poseActual[2])==180) { poseActual[1] = poseActual[1] - distanciaAvanzada;}
-  Serial.print("   Pose =>  X: ");
+  Serial.print("Pose =>  X: ");
   Serial.print(poseActual[0]);
   Serial.print("  Y: ");
   Serial.print(poseActual[1]);
