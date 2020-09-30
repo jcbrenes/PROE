@@ -184,11 +184,11 @@ void loop(){
         }
         
         case GIRO: {
-          giroTerminado=Giro(anguloGiro);
+          giroTerminado=Giro((float)anguloGiro);
           if(giroTerminado){
             digitalWrite(13,LOW);
+            poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
-            poseActual[2]==poseActual[2]+anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             estado=AVANCE;
           }
         }
@@ -268,6 +268,14 @@ void ActualizarUbicacion(){
   else if (poseActual[2]==90) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
   else if (poseActual[2]==-90) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
   else if (abs(poseActual[2])==180) { poseActual[1] = poseActual[1] - distanciaAvanzada;}
+  Serial.print("Dist: ");
+  Serial.print(distanciaAvanzada);
+  Serial.print("   Pose =>  X: ");
+  Serial.print(poseActual[0]);
+  Serial.print("  Y: ");
+  Serial.print(poseActual[1]);
+  Serial.print("  Theta: ");
+  Serial.println(poseActual[2]);
 }
 
 void RevisaObstaculoPeriferia(){
@@ -465,7 +473,7 @@ bool EstadoEstacionario (int pwmRuedaDer, int pwmRuedaIzq, int& contCiclosEstaci
     if(pwmRuedaDer==0 && pwmRuedaIzq==0){
        contCiclosEstacionario++;
        if (contCiclosEstacionario > minCiclosEstacionario){
-          ResetContadoresEncoders();
+          //ResetContadoresEncoders();
           contCiclosEstacionario=0;
           estadoEstacionarioAlcanzado= true;
        }     
@@ -584,7 +592,7 @@ bool AvanzarDistancia(int distanciaDeseada){
   bool avanceListo = false; 
   if (distanciaAvanzada >= distanciaDeseada) {
     avanceListo = true; 
-    ResetContadoresEncoders();
+    //ResetContadoresEncoders();
   }
   
   return avanceListo;
