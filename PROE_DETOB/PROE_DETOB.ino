@@ -140,7 +140,7 @@ void revisarTemperatura(){ //Lectura del sensor de temperatura
 }
 
 void revisarBateria(){ //Revisar la batería cada 20 ciclos del loop, codigo 6
-  if(digitalRead(lowBattery)){
+  if(!digitalRead(lowBattery)){ //Batería baja = pin bajo
     cuentaBateria++;
     if(cuentaBateria>=10000){ //Si la bateria esta baja enviar advertencia cada 10000 ciclos del loop principal
       //enviarDato(6,0,0);
