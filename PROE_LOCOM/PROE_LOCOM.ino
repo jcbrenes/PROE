@@ -264,9 +264,9 @@ void DeteccionObstaculo(){
 void ActualizarUbicacion(){
 //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual
   distanciaAvanzada= (int)calculaDistanciaLinealRecorrida();
-  if (poseActual[2]==0){ poseActual[1]= poseActual[1] + distanciaAvanzada;}
-  else if (poseActual[2]==90) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
-  else if (poseActual[2]==-90) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
+  if (poseActual[2]==0 || abs(poseActual[2]==360)){ poseActual[1]= poseActual[1] + distanciaAvanzada;}
+  else if (poseActual[2]==90 || poseActual[2]==-270) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
+  else if (poseActual[2]==-90 || poseActual[2]==270) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
   else if (abs(poseActual[2])==180) { poseActual[1] = poseActual[1] - distanciaAvanzada;}
   Serial.print("Dist: ");
   Serial.print(distanciaAvanzada);
