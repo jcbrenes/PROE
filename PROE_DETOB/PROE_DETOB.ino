@@ -75,6 +75,8 @@ void setup() {
   pinMode(int1, OUTPUT);
   pinMode(sharp, INPUT);
 
+  delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
+  
   //Configuración de interrupciones//
   attachInterrupt(irFrontal, irFrontalSend, FALLING); //Activo bajo
   attachInterrupt(irLeft, irLeftSend, RISING); //Activo alto
@@ -85,6 +87,7 @@ void setup() {
   Serial1.begin(115200);  //Inicia la comunicación serial a 115200 baud
   Serial1.println("On");  //Enviar un "on" por el serial para confirmar que el setup se ejecutó correctamente
 
+  delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
 }
  
 void loop() {

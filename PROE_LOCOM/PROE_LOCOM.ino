@@ -250,9 +250,9 @@ void DeteccionObstaculo(){
 
   if(giroTerminado==1){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
    digitalWrite(13,HIGH);
-   Serial.println("INT OBS!!");
+   Serial.print("INT OBS!  ");
    Serial.print(datosSensores[ultimoObstaculo][3]);
-   Serial.print("  dist: ");
+   Serial.print("  d: ");
    Serial.print(datosSensores[ultimoObstaculo][4]);
    Serial.print("  ang: ");
    Serial.println(datosSensores[ultimoObstaculo][5]);
@@ -268,7 +268,7 @@ void ActualizarUbicacion(){
   else if (poseActual[2]==90 || poseActual[2]==-270) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
   else if (poseActual[2]==-90 || poseActual[2]==270) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
   else if (abs(poseActual[2])==180) { poseActual[1] = poseActual[1] - distanciaAvanzada;}
-  Serial.print("Pose =>  X: ");
+  Serial.print("Pose=>  X: ");
   Serial.print(poseActual[0]);
   Serial.print("  Y: ");
   Serial.print(poseActual[1]);
@@ -293,6 +293,13 @@ void RevisaObstaculoPeriferia(){
         if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {obstaculoIzquierda=true;} 
     }
   }
+  Serial.print("ObsPeri=>  I:");
+  Serial.print(obstaculoIzquierda);
+  Serial.print("  A:");
+  Serial.print(obstaculoAdelante);
+  Serial.print("  D:");
+  Serial.println(obstaculoDerecha);
+  delay(10);
 }
 
 void AsignarDireccionRWD(){
@@ -306,7 +313,7 @@ void AsignarDireccionRWD(){
     int incrementoPosible = 90;
 
     //En esta condición especial se asigna una nueva dirección global
-    if (obstaculoAdelante || diferenciaOrientacion==0){ 
+    if (obstaculoAdelante && diferenciaOrientacion==0){ 
       direccionGlobal= (orientacionesRobot)(random(-1,3)*90); 
     }
     //Si hay un obstáculo o se está en una orientación diferente a la global, se restringen las opciones del aleatorio
@@ -316,15 +323,19 @@ void AsignarDireccionRWD(){
       incrementoPosible=180; //Un obstáculo adelante es un caso especial que implica girar a la derecha o izquierda (diferencia de 180°)
       maxRandom--;
     }
-    
-    if (maxRandom<minRandom){ 
-      //Si se da este caso, representa que no hay opciones ni adelante, ni izquierda, ni derecha. 
+    if (obstaculoIzquierda && obstaculoAdelante && obstaculoDerecha){ //condición especial (callejón)
       anguloGiro=180;
       direccionGlobal= (orientacionesRobot)(random(-1,3)*90); 
     }else{
       //La ecuación del ángulo de giro toma en cuenta todas las restricciones anteriores y lo pasa a escala de grados (nomenclatura de orientación)
       anguloGiro = random(minRandom,maxRandom)*incrementoPosible-90;
     }
+
+    Serial.print("DirGlobal: ");
+    Serial.print(direccionGlobal);
+    Serial.print("   Giro: ");
+    Serial.println(anguloGiro);
+    delay(10);
     
     //Reset de la simplificación sobre obstáculo en la pose actual
     obstaculoAdelante=false;
