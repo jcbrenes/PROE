@@ -124,6 +124,7 @@ void setup() {
   pinMode(BIN2, OUTPUT);
   pinMode(INT_OBSTACULO, INPUT_PULLUP);
   pinMode(13,OUTPUT); //LED del feather
+  delay(1000); //delay para evitar interrupciones al arrancar
   //asignación de interrupciones
   attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
   attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
@@ -133,12 +134,12 @@ void setup() {
   //temporización y varibales aleatorias
   tiempoActual=micros(); //para temporización de los ciclos
   randomSeed(analogRead(A5)); //Para el algoritmo de exploración, el pinA5 está al aire
-  direccionGlobal= (orientacionesRobot)(random(-1,3)*90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
+  direccionGlobal= (orientacionesRobot)(random(-1,2)*90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
   //Inicialización de puertos seriales
   Serial.begin(115200);
   Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
   Wire.onReceive(RecibirI2C);
-  delay(3000);
+  delay(2000);
 }
 
 void loop(){
@@ -306,7 +307,6 @@ void AsignarDireccionRWD(){
 //Función que escoge la dirección de giro para el robot en base al algoritmo Random Walk con Dirección
 //Actualiza la variable global anguloGiro
 
-    //Asigna dirección random en base a Rand Walk y obstáculos presentes
     int diferenciaOrientacion = poseActual[2] - (int)direccionGlobal;
     int minRandom = 0;
     int maxRandom = 3;
