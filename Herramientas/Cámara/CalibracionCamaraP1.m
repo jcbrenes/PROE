@@ -1,0 +1,36 @@
+%Calibración de la cámara
+
+%----------------Captura de imágenes de calibración-------------------
+
+%El objetivo es realizar la toma de imágenes para realizar la calibración
+%de la cámara. Es necesario lograr una cantidad de ejemplos útiles para que
+%la aplicación determine los parámetros correspondientes. 
+%A continuación se toman 10 imágenes, con un intervalo de 15 segundos entre
+%cada una, para dar tiempo a un acomodo variado de ángulos, inclinaciones
+%(bajas) y desplazamientos (cortos), realizados por la persona, dentro del área de
+%trabajo.
+
+%elimina las sesiones webcam anteriores y variables anteriores
+clear all 
+%limpia el command window
+clc 
+camList=webcamlist %Despliega la lista de cámaras disponibles
+cam=webcam(2) %Se selecciona la webcam DroidCam (cámara web inalámbrica remota con android)
+preview(cam); %Se muestra un recuadro con la imagen en tiempo real
+pause('on') %Activa la funcionalidad de pausa por x segundos
+for i = 1:10
+        %Se captura una imagen
+        img=snapshot(cam); 
+        %Se define el nombre de la imagen, según el contador
+        filename = ['Image' num2str(i)]; 
+        imwrite(img,filename,'png');
+        disp('Imagen # ');
+        disp(i);
+        disp(' capturada');
+        imshow(filename);
+        if i==10
+            disp('Fin de captura de imágenes');
+        end
+        pause(15);
+end
+
