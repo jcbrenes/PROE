@@ -112,6 +112,12 @@ enum orientacionesRobot {ADELANTE=0, DERECHA=90, IZQUIERDA=-90, ATRAS=180}; //Se
 orientacionesRobot direccionGlobal = ADELANTE; //Se inicializa Adelante, pero en Setup se asignará un valor random
 int anguloGiro = 0;
 
+//Variables para la calibración
+float alfaIzq=1;
+float betaIzq=0;
+float alfaDer=1;
+float betaDer=0;
+
 void setup() {
   //asignación de pines
   pinMode(PWMA, OUTPUT);
@@ -384,27 +390,31 @@ int ControlPosGiroRueda( float posRef, float posActual, float& sumErrorGiro, flo
 }
 
 void ConfiguraEscribePuenteH (int pwmRuedaDer, int pwmRuedaIzq){
-//Determina si es giro, avance, o retroceso en base a los valores de PWM y configura los pines del Puente H
-
-  if (pwmRuedaDer>=0 && pwmRuedaIzq>=0){
+  
+//Determina los valores de pwm corregidos según la calibración
+  int pwmRuedaIzqCorr=alfaIzq*pwmRuedaIzq+betaIzq; 
+  int pwmRuedaDerCorr=alfaDer*pwmRuedaDer+betaDer;
+  
+//Determina si es giro, avance, o retroceso en base a los valores de PWM y configura los pines del Puente H  
+  if (pwmRuedaDerCorr>=0 && pwmRuedaIzqCorr>=0){
     ConfiguracionAvanzar();
-    analogWrite(PWMB, pwmRuedaDer);
-    analogWrite(PWMA, pwmRuedaIzq);
+    analogWrite(PWMB, pwmRuedaDerCorr);
+    analogWrite(PWMA, pwmRuedaIzqCorr);
     
-  }else if (pwmRuedaDer<0 && pwmRuedaIzq<0){
+  }else if (pwmRuedaDerCorr<0 && pwmRuedaIzqCorr<0){
     ConfiguracionRetroceder();
-    analogWrite(PWMB, -pwmRuedaDer);
-    analogWrite(PWMA, -pwmRuedaIzq);
+    analogWrite(PWMB, -pwmRuedaDerCorr);
+    analogWrite(PWMA, -pwmRuedaIzqCorr);
     
-  }else if (pwmRuedaDer>0 && pwmRuedaIzq<0){
+  }else if (pwmRuedaDerCorr>0 && pwmRuedaIzqCorr<0){
     ConfiguracionGiroDerecho();
-    analogWrite(PWMB, pwmRuedaDer);
-    analogWrite(PWMA, -pwmRuedaIzq);
+    analogWrite(PWMB, pwmRuedaDerCorr);
+    analogWrite(PWMA, -pwmRuedaIzqCorr);
     
-  }else if (pwmRuedaDer<0 && pwmRuedaIzq>0){
+  }else if (pwmRuedaDerCorr<0 && pwmRuedaIzqCorr>0){
     ConfiguracionGiroIzquierdo();
-    analogWrite(PWMB, -pwmRuedaDer);
-    analogWrite(PWMA, pwmRuedaIzq);
+    analogWrite(PWMB, -pwmRuedaDerCorr);
+    analogWrite(PWMA, pwmRuedaIzqCorr);
   }
 }
 
