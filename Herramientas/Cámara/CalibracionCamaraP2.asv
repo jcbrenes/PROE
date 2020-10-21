@@ -54,8 +54,8 @@
 
 %ANTES DE CORRER ESTE CÓDIGO
 
-%SI TIENE HABILITADA LA OPCIÓN, DESDE LA APLICACIÓN DE CAMERA
-%CALIBRATOR, DE PULSAR EL BOTÓN "Calibrate", hágalo y espere, al finalizar la
+%SI TIENE HABILITADA LA OPCIÓN DESDE LA APLICACIÓN DE CAMERA
+%CALIBRATOR DE PULSAR EL BOTÓN "Calibrate", esperar y al finalizar la
 %operación, exportar parámetros llamándolos params. Al hacer esto, no sería
 %necesario correr este código.
 
