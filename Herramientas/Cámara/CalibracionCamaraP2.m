@@ -38,23 +38,32 @@
 %adicionalmente agregar un par de ejemplos un poco inclinados para que
 %permita calibrar correctamente. Guardar en la carpeta del programa
 
-% Si ya obtuvo, mediante este código las imágenes requeridas:
+% Si ya obtuvo, mediante el código CalibracionCamaraP1.m las imágenes requeridas:
 
 % Seleccionar Calibration/AddImages y seleccione el conjunto capturado
+% Si no aparecen las imágenes tomadas debe abrir el explorador de archivos
+% y cambiar su nombre con la extensión .png
 % El lado de cada cuadrado de calibración es de 40 mm
 % Una vez se logra un set de imágenes útiles para la calibración, se
 % deben eliminar los ejemplos que fueron rechazados.
-% Seleccionar el set de imágenes y Renombrar los archivos como Image.
-% Deberán aparecer los archivos como Image(1).png, Image(2).png...
+% Seleccionar el set de imágenes y Renombrar los archivos como Image,
+% deberán aparecer los archivos como Image(1).png, Image(2).png...
 % El número de imagen se pone entre paréntesis para diferenciar las
 % imágenes aceptadas, de todas las que fueron tomadas.
 % Cambiar numImages a la cantidad de imágenes útiles para calibración.
 
-clc;
-clear all;
-close all;
+%ANTES DE CORRER ESTE CÓDIGO:
+
+%SI TIENE HABILITADA LA OPCIÓN, DESDE LA APLICACIÓN DE CAMERA
+%CALIBRATOR, DE PULSAR EL BOTÓN "Calibrate", hágalo y espere, al finalizar la
+%operación, exportar parámetros llamándolos params. Al hacer esto, se deben
+%obtener los mismos resultados que al correr este código.
+%Si realiza la calibración con el Botón Calibrate, solamente debe ejecutar
+%las líneas 64 hasta 68, ya que contienen variables que se utilizarán más
+%adelante en Vision_Validacion.m
+
 cont=1;
-numImages = 9; %Cantidad de imagenes aceptadas para calibración
+numImages = 8; %Cantidad de imagenes aceptadas para calibración
 CantidadEjemplosCaptura=1;%Variable para modificar la cantidad de ejemplos que se almacenan en los resultados
 squareSize = 40; % Tamaño del lado del cuadro en el patrón de calibración, en mm
 tamanoCuadroMedicion=15;
@@ -63,7 +72,7 @@ tamanoCuadroMedicion=15;
 %Se debe modificar la extensión de búsqueda con la dirección de la carpeta
 %donde están las imágenes.
 
-extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas\';
+extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas\Cámara\';
 %cell genera una matriz de celdas, en este caso, de 1xnumImages
 files = cell(1, numImages);
 %fullfile retorna un vector con el directorio de un archivo
@@ -71,7 +80,7 @@ files = cell(1, numImages);
 for i = 1:numImages
     files{i} = fullfile(strcat(extensionImCalibracion,'Image(',num2str(i),').png'));
 end
-magnification = 25;
+magnification = 25; %no veo donde se usa aun.
 %Se determina I como toda la fila de extensiones de las imágenes para
 %calibración
 I = imread(files{1});

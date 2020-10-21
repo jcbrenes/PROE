@@ -5,7 +5,7 @@
 %El objetivo es realizar la toma de imágenes para realizar la calibración
 %de la cámara. Es necesario lograr una cantidad de ejemplos útiles para que
 %la aplicación determine los parámetros correspondientes. 
-%A continuación se toman 10 imágenes, con un intervalo de 15 segundos entre
+%A continuación se toman 10 imágenes, con un intervalo de 5 segundos entre
 %cada una, para dar tiempo a un acomodo variado de ángulos, inclinaciones
 %(bajas) y desplazamientos (cortos), realizados por la persona, dentro del área de
 %trabajo.
@@ -31,6 +31,7 @@ for i = 1:10
         if i==10
             disp('Fin de captura de imágenes');
         end
-        pause(15);
+        pause(5);
 end
-
+%Si se desea finalizar la ejecución del código de forma anticipada
+%presionar Ctrl + C

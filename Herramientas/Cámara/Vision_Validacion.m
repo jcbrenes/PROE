@@ -10,72 +10,24 @@
 %Para ser capaces de manejar los datos de la webcam es necesario importar
 %la biblioteca de webcam. Se descarga desde el gestor de bibliotecas.
 %Home/Add-Ons y buscar webcam.
-%
-    
-%----------Paso1: Abrir en APPS Camera Calibrator-------------------
-% Camera Calibrator se encuentra en la pestaña APPS->Image Proccessing
-%El objetivo es realizar la toma de imágenes para realizar la calibración
-%de la cámara. Es necesario lograr una cantidad de ejemplos útiles para que
-%la aplicación determine los parámetros correspondientes. 
-% 1.a: Seleccionar en Calibration/AddImages/FromCamera
-% 1.b: Seleccionar en CAMERA/Camera/ HD Pro Webcam C920
-% 1.c: Cambiar la resolución a la más alta en Camera Properties, y dejar lo
-% demás en auto
-% 1.d: Para iniciar la captura ajustar los valores de Capture Interval y el
-% número de imágenes a capturar. Finalmente dar clic en Capture.
-%Nota: Se debe tratar que el patrón de calibración esté en posiciones
-%diferentes y en orientaciones diferentes sobre el plano de trabajo,
-%adicionalmente agregar un par de ejemplos un poco inclinados para que
-%permita calibrar correctamente. Guardar en la carpeta del programa
-%ValidaciónGiro.
-% 1.e: Una vez se logra un set de imágenes útiles para la calibración, se
-% deben eliminar los ejemplos que fueron rechazados.
-% 1.f: Seleccionar el set de imágenes y Renombrar los archivos como Image.
-% Deberán aparecer los archivos como Image(1).png, Image(2).png...
-% 1.h: Cambiar numImages a la cantidad de imágenes útiles para calibración.
-
-%-------------Comentar de aqui para abajo para mayor agilidad--------
-clc;
-clear all;
-close all;
-cont=1;
-numImages = 11; %Cantidad de imagenes de calibración
-CantidadEjemplosCaptura=1;%Variable para modificar la cantidad de ejemplos que se almacenan en los resultados
-squareSize = 40; % Tamaño del lado del cuadro en el patrón de calibración, en mm
-tamanoCuadroMedicion=15;
-%--------Paso 2:Proceso de Calibración-----------------------
-%Se importan las imagenes de calibración que fueron previamente almacenadas
-%Se debe modificar la extensión de búsqueda con la dirección de la carpeta
-%donde están las imágenes.
-extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas';
-
-files = cell(1, numImages);
-for i = 1:numImages
-    files{i} = fullfile(strcat(extensionImCalibracion,'Image (',num2str(i),').png'));
-end
-magnification = 25;
-I = imread(files{1});
-[imagePoints, boardSize] = detectCheckerboardPoints(files);
-worldPoints = generateCheckerboardPoints(boardSize, squareSize);
-params = estimateCameraParameters(imagePoints, worldPoints);
-
-
-
 
 
 %--------------Etapa de captura de imágenes
-
+clear cam;
+tamanoCuadroMedicion=15;
 for img= 1:CantidadEjemplosCaptura
     cam=webcam(2);%Selecciona la camara USB
-    cam.Resolution='2304x1536'; %Es la resolución máxima de la cámara
+    cam.Resolution='640x480'; %Es la resolución máxima de la cámara
     h = msgbox('Capture Imagen');
     for j=1:2
         filename=strcat('ejemplo',num2str(img),'(',num2str(j),').jpg');
-        %preview(cam);
+        %strcat concatena caracteres
+        preview(cam);
         pause;
         b=snapshot(cam);
         imwrite(b,filename);
         h = msgbox(strcat('ejemplo',num2str(img),'(',num2str(j),').jpg'));
+        %msgbox crea una caja de mensaje
     end
     closePreview(cam);
     clear cam;
@@ -84,13 +36,20 @@ for img= 1:CantidadEjemplosCaptura
     %ejemplo 5(2).jpg.
 
     Im1=imread(strcat('ejemplo',num2str(img),'(1).jpg'));
-    %Requiere la conversión de el espacio de color rgb que corresponde a 3
+    %Requiere la conversión del espacio de color rgb que corresponde a 3
     %matrices, una del color rojo, una del verde y otra del azul a una sola
     %matriz en intensidad de grises.
    
     Im2=imread(strcat('ejemplo',num2str(img),'(2).jpg'));
     %Leer la imagen a medir
     imOrig = Im1;
+    
+    %----prueba------------------------------------------------------------
+    [imagePoints,boardSize] = detectCheckerboardPoints(imOrig);
+    squareSize = 40; 
+    worldPoints = generateCheckerboardPoints(boardSize,squareSize);
+    imageSize = [size(imOrig, 1), size(imOrig, 2)];
+    %------fin de la prueba------------------------------------------------
 
     points = detectCheckerboardPoints(imOrig);
     [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
@@ -99,9 +58,11 @@ for img= 1:CantidadEjemplosCaptura
     %Los pasos anteriores corresponden a la eliminación de la distorsión de
     %la imagen, se utilizó los parámetros de calibración encontrados al
     %inicio.
+    %Se realiza la conversión RGB to Grayscale de "im"
     Im1GRIS=rgb2gray(im);
-    Im1BN=im2bw(Im1GRIS,0.4);%0.6corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
-    
+    %Se realiza la conversión binaria de la imagen. Ahora solo habrá negro
+    %o blanco, según el umbral definido
+    Im1BN=im2bw(Im1GRIS,0.6);%0.X corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
     
     %De aquí en adelante se trabaja con im, que es la imagen con la distorsión
     %eliminada.
@@ -118,6 +79,7 @@ for img= 1:CantidadEjemplosCaptura
     %imagen a unidades reales.
     mmPorPixel=mmCuadroPatron/pixelesCuadroPatron
     %ya se tiene almacenado la conversion correspondiente en mm/pixel
+    
     imOrig = Im2;
 
     points = detectCheckerboardPoints(imOrig);
@@ -125,7 +87,7 @@ for img= 1:CantidadEjemplosCaptura
     [im, newOrigin] = undistortImage(imOrig, params, 'OutputView', 'full');
     undistortedPoints = [undistortedPoints(:,1) - newOrigin(1), undistortedPoints(:,2) - newOrigin(2)];
     Im2GRIS=rgb2gray(im);
-    Im2BN=im2bw(Im2GRIS,0.4);
+    Im2BN=im2bw(Im2GRIS,0.6);
     ImSuperpuesta=Im1BN&Im2BN;
     %Se superponen las dos imágenes con  la segmentación del patrón
     %utilizado para determinar la orientación de los robots.
@@ -142,8 +104,8 @@ for img= 1:CantidadEjemplosCaptura
     %---Extracción de los círculos----------------------------
     %Se está utilizando la funcion de Hough circular con la función
     %imfindcircles,permite la detección de círculos oscuros mediante
-    %ObjectPolarity,
-    %Se presenta la primerpa parte para la detección de los círculos pequeños,
+    %ObjectPolarity.
+    %Se presenta la primera parte para la detección de los círculos pequeños,
     %las respuestas se almacenan en centroPequeño y radioPequeño.
     [dimensionY dimensionX]=size(Im1(:,:,1));
     [centers, radii] = imfindcircles(Im1,[Rmin Rmax],'ObjectPolarity','dark');
@@ -187,7 +149,8 @@ for img= 1:CantidadEjemplosCaptura
     %Se requiere determinar el ángulo de separación entre la orientación
     %inicial y la orientación final, para esto, se referencian ambos
     %vectores respecto al eje horizontal de la imagen
-    citaInicial=atan2(vect1(2),vect1(1))*180/pi; %cita_inicial
+    %atan2 retorna la tangente inversa en el cuarto cuadrante de Y y X
+    citaInicial=atan2(vect1(2),vect1(1))*180/pi; %cita_inicial en grados
     if(citaInicial<=0)
         citaInicial=360+citaInicial;
     end
@@ -196,6 +159,7 @@ for img= 1:CantidadEjemplosCaptura
         citaFinal=360+citaFinal;
     end
     deltaCita = citaFinal-citaInicial%delta_cita es el error en la orientación
+    %norm retorna la norma euclídea de un vector
     distancia=norm((centroGrande(1,:)-centroGrande(2,:))); %desplazamiento en pixeles del punto de partida y el punto final
     r_exp=distancia*mmPorPixel %r_experimental es el desplazamiento en mm
     deltaX=(centroGrande(1,2)-centroGrande(1,1))*mmPorPixel;%deltaX del desplazamiento experimental, con la imagen
