@@ -43,6 +43,13 @@ for img= 1:CantidadEjemplosCaptura
     Im2=imread(strcat('ejemplo',num2str(img),'(2).jpg'));
     %Leer la imagen a medir
     imOrig = Im1;
+    
+    %----prueba------------------------------------------------------------
+    [imagePoints,boardSize] = detectCheckerboardPoints(imOrig);
+    squareSize = 40; 
+    worldPoints = generateCheckerboardPoints(boardSize,squareSize);
+    imageSize = [size(imOrig, 1), size(imOrig, 2)];
+    %------fin de la prueba------------------------------------------------
 
     points = detectCheckerboardPoints(imOrig);
     [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
@@ -55,7 +62,7 @@ for img= 1:CantidadEjemplosCaptura
     Im1GRIS=rgb2gray(im);
     %Se realiza la conversión binaria de la imagen. Ahora solo habrá negro
     %o blanco, según el umbral definido
-    Im1BN=im2bw(Im1GRIS,0.4);%0.X corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
+    Im1BN=im2bw(Im1GRIS,0.6);%0.X corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
     
     %De aquí en adelante se trabaja con im, que es la imagen con la distorsión
     %eliminada.
@@ -80,7 +87,7 @@ for img= 1:CantidadEjemplosCaptura
     [im, newOrigin] = undistortImage(imOrig, params, 'OutputView', 'full');
     undistortedPoints = [undistortedPoints(:,1) - newOrigin(1), undistortedPoints(:,2) - newOrigin(2)];
     Im2GRIS=rgb2gray(im);
-    Im2BN=im2bw(Im2GRIS,0.4);
+    Im2BN=im2bw(Im2GRIS,0.6);
     ImSuperpuesta=Im1BN&Im2BN;
     %Se superponen las dos imágenes con  la segmentación del patrón
     %utilizado para determinar la orientación de los robots.

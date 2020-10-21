@@ -80,7 +80,7 @@ files = cell(1, numImages);
 for i = 1:numImages
     files{i} = fullfile(strcat(extensionImCalibracion,'Image(',num2str(i),').png'));
 end
-magnification = 25;
+magnification = 25; %no veo donde se usa aun.
 %Se determina I como toda la fila de extensiones de las imágenes para
 %calibración
 I = imread(files{1});
