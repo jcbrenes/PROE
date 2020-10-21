@@ -52,16 +52,16 @@
 % imágenes aceptadas, de todas las que fueron tomadas.
 % Cambiar numImages a la cantidad de imágenes útiles para calibración.
 
-%ANTES DE CORRER ESTE CÓDIGO
+%ANTES DE CORRER ESTE CÓDIGO:
 
 %SI TIENE HABILITADA LA OPCIÓN, DESDE LA APLICACIÓN DE CAMERA
 %CALIBRATOR, DE PULSAR EL BOTÓN "Calibrate", hágalo y espere, al finalizar la
-%operación, exportar parámetros llamándolos params. Al hacer esto, no sería
-%necesario correr este código.
+%operación, exportar parámetros llamándolos params. Al hacer esto, se deben
+%obtener los mismos resultados que al correr este código.
+%Si realiza la calibración con el Botón Calibrate, solamente debe ejecutar
+%las líneas 64 hasta 68, ya que contienen variables que se utilizarán más
+%adelante en Vision_Validacion.m
 
-clc;
-clear all;
-close all;
 cont=1;
 numImages = 8; %Cantidad de imagenes aceptadas para calibración
 CantidadEjemplosCaptura=1;%Variable para modificar la cantidad de ejemplos que se almacenan en los resultados
