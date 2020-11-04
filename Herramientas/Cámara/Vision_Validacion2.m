@@ -1,17 +1,3 @@
-%****Herramienta de visión para validar movimientos de robots del proyecto PROE
-%****Implementada mediante Matlab
-
-%Este programa tiene como objetivo la estimación del ángulo de giro y la
-%separación entre los agentes utilizando un patrón visual como referencia
-%Requiere de la captura de dos imágenes, una antes del movimiento y otra
-%posterior al mismo.
-%Adicionalmente, se realiza una calibración de la cámara para eliminar
-%distorsion provocado por el lente, para mayor referencia : https://www.mathworks.com/help/vision/ug/camera-calibration.html
-%Para ser capaces de manejar los datos de la webcam es necesario importar
-%la biblioteca de webcam. Se descarga desde el gestor de bibliotecas.
-%Home/Add-Ons y buscar webcam.
-
-
 %--------------Etapa de captura de imágenes
 clear cam;
 tamanoCuadroMedicion=40;
@@ -32,8 +18,8 @@ for img= 1:CantidadEjemplosCaptura
     closePreview(cam);
     clear cam;
     
-    %ejemplo corresponde al nombre de la imagen, carga el ejemplo 5(1).jpg y el
-    %ejemplo 5(2).jpg.
+    %ejemplo corresponde al nombre de la imagen, carga el ejemplo 1(1).jpg y el
+    %ejemplo 1(2).jpg.
 
     Im1=imread(strcat('ejemplo',num2str(img),'(1).jpg'));
     %Requiere la conversión del espacio de color rgb que corresponde a 3
@@ -43,33 +29,21 @@ for img= 1:CantidadEjemplosCaptura
     Im2=imread(strcat('ejemplo',num2str(img),'(2).jpg'));
     %Leer la imagen a medir
     imOrig = Im1;
-    
-    %----prueba------------------------------------------------------------
-    [imagePoints,boardSize] = detectCheckerboardPoints(imOrig);
-    squareSize = 40; 
-    worldPoints = generateCheckerboardPoints(boardSize,squareSize);
-    imageSize = [size(imOrig, 1), size(imOrig, 2)];
-    %------fin de la prueba------------------------------------------------
 
-    points = detectCheckerboardPoints(imOrig);
-    [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
-    [im, newOrigin] = undistortImage(imOrig, params, 'OutputView', 'full');
-    undistortedPoints = [undistortedPoints(:,1) - newOrigin(1), undistortedPoints(:,2) - newOrigin(2)];
-    %Los pasos anteriores corresponden a la eliminación de la distorsión de
-    %la imagen, se utilizó los parámetros de calibración encontrados al
-    %inicio.
     %Se realiza la conversión RGB to Grayscale de "im"
-    Im1GRIS=rgb2gray(im);
+    Im1GRIS=rgb2gray(Im1);
     %Se realiza la conversión binaria de la imagen. Ahora solo habrá negro
     %o blanco, según el umbral definido
     Im1BN=im2bw(Im1GRIS,0.6);%0.X corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
-    
-    %De aquí en adelante se trabaja con im, que es la imagen con la distorsión
-    %eliminada.
-    [imagePoints, boardSize] = detectCheckerboardPoints(im);
+     
+    %De aquí en adelante se trabaja con Im1 (sin quitar distorision)
+    [imagePoints, boardSize] = detectCheckerboardPoints(Im1);
     worldPoints = generateCheckerboardPoints(boardSize, tamanoCuadroMedicion);
+    %R es la matriz de rotacion y t el vector de traslacion.
+    %Permite transformar puntos del sistema coordenado del mundo
+    %hasta el sistema coordenado de la camara.
     [R, t] = extrinsics(imagePoints, worldPoints, params);
-    worldPoints1 = pointsToWorld(params, R, t, undistortedPoints);
+    worldPoints1 = pointsToWorld(params, R, t, imagePoints);
     d = worldPoints1(2, :) - worldPoints1(1, :);
     mmCuadroPatron=hypot(d(1), d(2))
     d=undistortedPoints(2,:)-undistortedPoints(1,:)

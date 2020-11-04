@@ -63,10 +63,10 @@
 %adelante en Vision_Validacion.m
 
 cont=1;
-numImages = 8; %Cantidad de imagenes aceptadas para calibración
+numImages = 7; %Cantidad de imagenes aceptadas para calibración
 CantidadEjemplosCaptura=1;%Variable para modificar la cantidad de ejemplos que se almacenan en los resultados
 squareSize = 40; % Tamaño del lado del cuadro en el patrón de calibración, en mm
-tamanoCuadroMedicion=15;
+tamanoCuadroMedicion=15; %aun no se encuentra por qué 15
 %--------Proceso de Calibración-----------------------
 %Se importan las imagenes de calibración que fueron previamente almacenadas
 %Se debe modificar la extensión de búsqueda con la dirección de la carpeta
