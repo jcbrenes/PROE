@@ -43,13 +43,6 @@ for img= 1:CantidadEjemplosCaptura
     Im2=imread(strcat('ejemplo',num2str(img),'(2).jpg'));
     %Leer la imagen a medir
     imOrig = Im1;
-    
-    %----prueba------------------------------------------------------------
-    [imagePoints,boardSize] = detectCheckerboardPoints(imOrig);
-    squareSize = 40; 
-    worldPoints = generateCheckerboardPoints(boardSize,squareSize);
-    imageSize = [size(imOrig, 1), size(imOrig, 2)];
-    %------fin de la prueba------------------------------------------------
 
     points = detectCheckerboardPoints(imOrig);
     [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
@@ -111,6 +104,8 @@ for img= 1:CantidadEjemplosCaptura
     [centers, radii] = imfindcircles(Im1,[Rmin Rmax],'ObjectPolarity','dark');
     centroPequeno(1,:) = centers(1:cantidadCirculos,:);
     radioPequeno(1) = radii(1:cantidadCirculos); 
+    %dark significa que los objetos circulares son más oscuros que el
+    %fondo.
     [centers, radii] = imfindcircles(Im2,[Rmin Rmax],'ObjectPolarity','dark');
     centroPequeno(2,:) = centers(1:cantidadCirculos,:);
     radioPequeno(2) = radii(1:cantidadCirculos);
@@ -121,6 +116,8 @@ for img= 1:CantidadEjemplosCaptura
 
     %Se realiza la búsqueda de los círculos grandes y los resultados se
     %almancenan en centroGrande y radioGrande.
+    %Viscircles dibuja círculos con los ejes especificados y en los ejes
+    %actuales
     viscircles(centroPequeno, radioPequeno,'EdgeColor','r');
     plot(centers(:,1),centers(:,2),'rx')
     [centers, radii] = imfindcircles(Im1,[Rmin2 Rmax2],'ObjectPolarity','dark');
