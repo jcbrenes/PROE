@@ -31,7 +31,7 @@ for i = 1:10
         if i==10
             disp('Fin de captura de imágenes');
         end
-        pause(5);
+        pause(3);
 end
 %Si se desea finalizar la ejecución del código de forma anticipada
 %presionar Ctrl + C

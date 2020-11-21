@@ -14,10 +14,10 @@
 
 %--------------Etapa de captura de imágenes
 clear cam;
-tamanoCuadroMedicion=15;
+tamanoCuadroMedicion=40;
 for img= 1:CantidadEjemplosCaptura
     cam=webcam(2);%Selecciona la camara USB
-    cam.Resolution='640x480'; %Es la resolución máxima de la cámara
+    cam.Resolution='640x480'; %Es la resolución máxima de la cámara (DroidCam)
     h = msgbox('Capture Imagen');
     for j=1:2
         filename=strcat('ejemplo',num2str(img),'(',num2str(j),').jpg');
@@ -43,13 +43,6 @@ for img= 1:CantidadEjemplosCaptura
     Im2=imread(strcat('ejemplo',num2str(img),'(2).jpg'));
     %Leer la imagen a medir
     imOrig = Im1;
-    
-    %----prueba------------------------------------------------------------
-    [imagePoints,boardSize] = detectCheckerboardPoints(imOrig);
-    squareSize = 40; 
-    worldPoints = generateCheckerboardPoints(boardSize,squareSize);
-    imageSize = [size(imOrig, 1), size(imOrig, 2)];
-    %------fin de la prueba------------------------------------------------
 
     points = detectCheckerboardPoints(imOrig);
     [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
@@ -84,20 +77,26 @@ for img= 1:CantidadEjemplosCaptura
 
     points = detectCheckerboardPoints(imOrig);
     [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
+    %Al quitar la distorsión a la imagen aumenta su tamaño de 480x640 a
+    %625x785
     [im, newOrigin] = undistortImage(imOrig, params, 'OutputView', 'full');
     undistortedPoints = [undistortedPoints(:,1) - newOrigin(1), undistortedPoints(:,2) - newOrigin(2)];
     Im2GRIS=rgb2gray(im);
-    Im2BN=im2bw(Im2GRIS,0.6);
+    Im2BN=im2bw(Im2GRIS,0.7);
     ImSuperpuesta=Im1BN&Im2BN;
     %Se superponen las dos imágenes con  la segmentación del patrón
     %utilizado para determinar la orientación de los robots.
 
     %---Parámetros de detección del patrón----------------------- 
     cantidadCirculos=1; %Parámetro utilizado en las funciones de extracción de círculos
-    Rmin=20;%usado para buscar los círculos pequeños, variar en caso de no detección
-    Rmax=30;%usado en el círculo pequeño
-    Rmin2=30;%utilizado para determinar el círculo grande
-    Rmax2=50;%utilizado para el círculo grande
+    %Importante: Rmin y Rmax están en pixels, no en mm.
+    %Debe estimarse su valor medio como Rmedio= (RadioReal/mmPorPixel)±
+    %tolerancia en pixels
+    %Al cambiar la altura de la cámara deben cambiarse estos valores
+    Rmin=5;%usado para buscar los círculos pequeños, variar en caso de no detección
+    Rmax=12;%usado en el círculo pequeño
+    Rmin2=11;%utilizado para determinar el círculo grande
+    Rmax2=20;%utilizado para el círculo grande
     RminRef=90;% utilizados para la detección del sistema de coordenadas.
     RmaxRef=110;
     
@@ -111,6 +110,8 @@ for img= 1:CantidadEjemplosCaptura
     [centers, radii] = imfindcircles(Im1,[Rmin Rmax],'ObjectPolarity','dark');
     centroPequeno(1,:) = centers(1:cantidadCirculos,:);
     radioPequeno(1) = radii(1:cantidadCirculos); 
+    %dark significa que los objetos circulares son más oscuros que el
+    %fondo.
     [centers, radii] = imfindcircles(Im2,[Rmin Rmax],'ObjectPolarity','dark');
     centroPequeno(2,:) = centers(1:cantidadCirculos,:);
     radioPequeno(2) = radii(1:cantidadCirculos);
@@ -121,6 +122,8 @@ for img= 1:CantidadEjemplosCaptura
 
     %Se realiza la búsqueda de los círculos grandes y los resultados se
     %almancenan en centroGrande y radioGrande.
+    %Viscircles dibuja círculos con los ejes especificados y en los ejes
+    %actuales
     viscircles(centroPequeno, radioPequeno,'EdgeColor','r');
     plot(centers(:,1),centers(:,2),'rx')
     [centers, radii] = imfindcircles(Im1,[Rmin2 Rmax2],'ObjectPolarity','dark');
@@ -143,7 +146,7 @@ for img= 1:CantidadEjemplosCaptura
     %separación
     ab1 =[lineasCarro1(1,1)-lineasCarro1(2,1) -(lineasCarro1(1,2)-lineasCarro1(2,2))]; 
     ab2 = [lineasCarro2(1,1)-lineasCarro2(2,1) -(lineasCarro2(1,2)-lineasCarro2(2,2))]; 
-    vect1 = ab1;%Vector del agente antes de inicial su movimiento
+    vect1 = ab1;%Vector del agente antes de iniciar su movimiento
     vect2 = ab2;%Vector del agente al finalizar su movimiento
     vectRef=[100 0];%Vector horizontal en la imagen
     %Se requiere determinar el ángulo de separación entre la orientación
@@ -164,8 +167,14 @@ for img= 1:CantidadEjemplosCaptura
     r_exp=distancia*mmPorPixel %r_experimental es el desplazamiento en mm
     deltaX=(centroGrande(1,2)-centroGrande(1,1))*mmPorPixel;%deltaX del desplazamiento experimental, con la imagen
     deltaY=(centroGrande(2,2)-centroGrande(2,1))*mmPorPixel;%deltay del desplazamiento exp, con la imagen
-    betaExp=atan2(deltaY/deltaX)*180/pi;%angulo del desplazamiento experimental, referenciado con la imagen
-    betaTeorico=anguloVector1;% se rota el sistema para que coincida con el del agente
+    %atan devuelve la arcotangente inversa del cuarto cuadrante.
+    betaExp=atan2(deltaY,deltaX)*(180/pi);%angulo del desplazamiento experimental, referenciado con la imagen
+    
+    %Por revisar, al parecer es para tener un mismo marco de referencia (Por confirmar)
+    %Lo que viene está comentado porque anguloVector1 no está definido
+    %anteriormente
+    %betaTeorico=anguloVector1;% se rota el sistema para que coincida con el del agente
+    betaTeorico=-148;% se ingresa el ángulo medido manualmente 
     deltaBeta=betaExp-betaTeorico;%diferencia entre el desplazamiento teórico y el experimental
     deltaX2=r_exp*cos(deltaBeta)*180/pi;%proyección x del r_exp sobre el desplazamiento teórico
     deltaY2=r_exp*sin(deltaBeta)*180/pi;%proyección y del r_exp sobre el desplazamiento teórico
