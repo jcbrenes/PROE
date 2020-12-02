@@ -1,16 +1,4 @@
-%Este script permite probar el correcto funcionamiento de 
-%la aplicación Droid Cam. Para su correcto funcionamiento
-%se requiere tener instalado y corriendo el app en el móvil
-%android, así como el cliente para Windows. (Ambos dispositivos)
-%conectados a la misma red Wi-fi.
-%Además, debe instalarse el Matlab Support Package for USB webcams
-% que se puede encontrar en el siguiente url:
-%https://la.mathworks.com/matlabcentral/fileexchange/45182-matlab-support-package-for-usb-webcams
-%camList=webcamlist
-%cam=webcam(2)
-%preview(cam);
-%img=snapshot(cam)
-%image(img)
+
 
 
 %Adicionalmente, se realiza una calibración de la cámara para eliminar
