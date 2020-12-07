@@ -45,14 +45,16 @@ clear all
 clc 
 camList=webcamlist %Despliega la lista de cámaras disponibles
 cam=webcam(2) %Se selecciona la webcam DroidCam (cámara web inalámbrica remota con android)
+cam.Resolution = '1920x1080' %Ajusta la resolución de la webcam USB
+cam.Brightness = 150 %Ajusta el brillo de la webcam
 preview(cam); %Se muestra un recuadro con la imagen en tiempo real
 pause('on') %Activa la funcionalidad de pausa, que permite detener x segundos la ejecución
 for i = 1:10
         %Se captura una imagen
         img=snapshot(cam); 
         %Se define el nombre de la imagen, según el contador
-        filename = ['Image' num2str(i)]; 
-        imwrite(img,filename,'png');
+        filename = ['Image' num2str(i) '.png']; 
+        imwrite(img,filename); %Se quitó ,'png'   después de filename.
         disp('Imagen # '); %Se muestra en pantalla el # de imagen capturada
         disp(i);
         disp(' capturada');
