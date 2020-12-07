@@ -13,6 +13,8 @@ clear all
 clc 
 camList=webcamlist %muestra las cámaras disponibles
 cam=webcam(2) %selecciona la 2, es decir Droidcam
+cam.Resolution = '1920x1080' %Ajusta la resolución de la webcam USB
+cam.Brightness = 150 %Ajusta el brillo de la webcam
 preview(cam); %muestra en tiempo real la cámara
-img=snapshot(cam) %toma de una imagen
+img=snapshot(cam); %toma de una imagen
 image(img) %muestra la imagen capturada
