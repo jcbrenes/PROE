@@ -51,7 +51,7 @@
 %adelante en Vision_Validacion.m
 
 cont=1;
-numImages = 7; %Cantidad de imagenes aceptadas para calibración
+numImages = 10; %Cantidad de imagenes aceptadas para calibración
 CantidadEjemplosCaptura=1;%Variable para modificar la cantidad de ejemplos que se almacenan en los resultados
 squareSize = 40; % Tamaño del lado del cuadro en el patrón de calibración, en mm
 tamanoCuadroMedicion=15; %aun no se encuentra por qué 15
@@ -60,7 +60,14 @@ tamanoCuadroMedicion=15; %aun no se encuentra por qué 15
 %Se debe modificar la extensión de búsqueda con la dirección de la carpeta
 %donde están las imágenes.
 
-extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas\Cámara\';
+%Aquí se cambia la dirección de las imágenes según la computadora con la
+%que se trabaje.
+
+%Dirección Kevin
+%extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas\Cámara\';
+
+%Dirección Cindy
+extensionImCalibracion='C:\Users\ccalderon\OneDrive - TEC\GitHub\PROE\Herramientas\Cámara\';
 %cell genera una matriz de celdas, en este caso, de 1xnumImages
 files = cell(1, numImages);
 %fullfile retorna un vector con el directorio de un archivo
