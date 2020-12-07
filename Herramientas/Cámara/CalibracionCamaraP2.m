@@ -64,10 +64,10 @@ tamanoCuadroMedicion=15; %aun no se encuentra por qué 15
 %que se trabaje.
 
 %Dirección Kevin
-%extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas\Cámara\';
+extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas\Cámara\';
 
 %Dirección Cindy
-extensionImCalibracion='C:\Users\ccalderon\OneDrive - TEC\GitHub\PROE\Herramientas\Cámara\';
+%extensionImCalibracion='C:\Users\ccalderon\OneDrive - TEC\GitHub\PROE\Herramientas\Cámara\';
 %cell genera una matriz de celdas, en este caso, de 1xnumImages
 files = cell(1, numImages);
 %fullfile retorna un vector con el directorio de un archivo
