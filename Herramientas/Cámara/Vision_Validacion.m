@@ -14,11 +14,12 @@
 
 %--------------Etapa de captura de imágenes
 clear cam;
+CantidadEjemplosCaptura=1; %Esta es la cantidad de distintas mediciones que se tomarán 
 tamanoCuadroMedicion=40;
 for img= 1:CantidadEjemplosCaptura
     cam=webcam(2);%Selecciona la camara USB
     %cam.Resolution='640x480'; %Es la resolución máxima de la cámara (DroidCam)
-    cam.Resolution='1920x1080'; %Es la resolución máxima de la cámara web logitec
+    cam.Resolution='1920x1080'; %Es la resolución máxima de la cámara (DroidCam)
     h = msgbox('Capture Imagen');
     for j=1:2
         filename=strcat('ejemplo',num2str(img),'(',num2str(j),').jpg');
