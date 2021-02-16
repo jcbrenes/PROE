@@ -116,6 +116,7 @@ float sumXX,sumYY,sumXY; //Sumas para los momentos de inercia
 float uXX,uYY,uXY; //Momentos de inercia
 float preAng,angulo; //Angulo de rotación de los datos
 double factorEsc; //Factor de escalamiento para lograr un círculo
+float xft,yft; //Valores filtrados
 
 void setup() {
   //asignación de pines
@@ -168,8 +169,6 @@ void loop() {
      delay(3000); 
      //Filtrado de datos
      for (int s=0;s<=i;s++){
-      float xft=0;
-      float yft=0; 
       float crudox=rawx[s];
       float crudoy=rawy[s];
       xft=crudox*alfa+(1-alfa)*xft;
@@ -188,12 +187,8 @@ void loop() {
     xoff=(maxX+minX)/2;
     yoff=(maxY+minY)/2;
     for (int p=0;p<=i;p++){
-        float xof=0;
-        float yof=0;
-        xof=rawx[p]-xoff;
-        yof=rawy[p]-yoff;
-        rawx[p]=xof;
-        rawy[p]=yof;
+        rawx[p]=rawx[p]-xoff;
+        rawy[p]=rawy[p]-yoff;
     }
     //Determina los segundos momentos de inercia
     for (int h=0;h<=i;h++){
@@ -204,14 +199,8 @@ void loop() {
     uXX=sumXX/i;
     uYY=sumYY/i;
     uXY=sumXY/i;
-    //Calcula el Ã¡ngulo
-    preAng=atan2((2*uXY),(uXX-uYY));
-    if (preAng<0){
-      angulo=0.5*(preAng+2*PI);
-    }
-    else{
-      angulo=0.5*preAng;
-    }
+    //Calcula el angulo
+    angulo=0.5*atan2((2*uXY),(uXX-uYY));
     //Rota los datos
     for (int f=0;f<=i;f++){
     float xrot=0;
@@ -245,7 +234,6 @@ void loop() {
         rawy[u]=yf; 
       }
     }
-    
     Serial.println("Datos para eje x ");
      for (int g = 0; g <= i; g = g + 1) {
       Serial.println(rawx[g]);
