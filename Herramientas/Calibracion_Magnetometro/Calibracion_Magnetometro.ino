@@ -10,6 +10,7 @@ TwoWire myWire(&sercom1, 11, 13);
 
 #define addr 0x0D //I2C Address for The HMC5883
 #define PI 3.1415926535897932384626433832795 //Constante Pi
+#define dirEEPROM B01010000 //Direccion de la memoria EEPROM
 
 //constantes del robot empleado
 const int tiempoMuestreo = 10000; //unidades: micro segundos
@@ -147,16 +148,18 @@ void loop() {
   short x2,y2,z2;
   float x1,y1,d;
   medirMagnet(x2,y2,z2);
+  //Toma las muestras con la función Giro() sobre una circunferencia completa
   if(Giro(360)==false){
-    if (i==0){
+    if (i==0){ //La variable i definirá la cantidad de datos que se tomen
         rawx[i]=float(x2);
         rawy[i]=float(y2);
         i++;
       }
+      //Algoritmo que funciona durante la toma de datos para eliminar datos redundantes para no exceder la RAM del feather
       else{
         x1=rawx[i-1];
         y1=rawy[i-1];
-        d=sqrt(pow(abs(x2-x1),2)+pow(abs(y2-y1),2));
+        d=sqrt(pow(abs(x2-x1),2)+pow(abs(y2-y1),2)); //Distancia euclideana entre 2 pares de puntos
         if (d>=1.0){
           rawx[i]=float(x2);
           rawy[i]=float(y2);
@@ -164,8 +167,9 @@ void loop() {
         }
       }
     }
+    //Etapa de filtrado, se utiliza el filtro de "Media movil"
    else{
-     Serial.println("Filtrando datos...");
+     Serial.println("Procesando datos...");
      delay(3000); 
      //Filtrado de datos
      for (int s=0;s<=i;s++){
@@ -173,7 +177,7 @@ void loop() {
       float crudoy=rawy[s];
       xft=crudox*alfa+(1-alfa)*xft;
       yft=crudoy*alfa+(1-alfa)*yft;
-      if (s>=desfase){
+      if (s>=desfase){ //El desfase se implementa para eliminar datos iniciales basura
         rawx[s-desfase]=xft;
         rawy[s-desfase]=yft; 
       }
@@ -201,66 +205,21 @@ void loop() {
     uXY=sumXY/i;
     //Calcula el angulo
     angulo=0.5*atan2((2*uXY),(uXX-uYY));
-    //Rota los datos
-    for (int f=0;f<=i;f++){
-    float xrot=0;
-    float yrot=0;
-    xrot=rawx[f]*cos(-angulo)-rawy[f]*sin(-angulo);
-    yrot=rawx[f]*sin(-angulo)+rawy[f]*cos(-angulo);
-    rawx[f]=xrot;
-    rawy[f]=yrot;
-    }
-    
     //Escalado
     if ((maxX-minX)>(maxY-minY)){
       factorEsc=(maxX-minX)/(maxY-minY);
-      for (int u=0;u<=i;u++){
-        float xf=0;
-        float yf=0;
-        xf=cos(angulo)*rawx[u]-rawy[u]*sin(angulo)*factorEsc;
-        yf=sin(angulo)*rawx[u]+cos(angulo)*rawy[u]*factorEsc;
-        rawx[u]=xf;
-        rawy[u]=yf;  
-      }
     }
     else{
       factorEsc=(maxY-minY)/(maxX-minX);
-      for (int u=0;u<=i;u++){
-        float xf=0;
-        float yf=0;
-        xf=cos(angulo)*rawx[u]*factorEsc-rawy[u]*sin(angulo);
-        yf=sin(angulo)*rawx[u]*factorEsc+cos(angulo)*rawy[u];
-        rawx[u]=xf;
-        rawy[u]=yf; 
-      }
-    }
-    Serial.println("Datos para eje x ");
-     for (int g = 0; g <= i; g = g + 1) {
-      Serial.println(rawx[g]);
-     }
-     Serial.println("Datos para eje y ");
-     for (int m = 0; m <= i; m = m + 1) {
-      Serial.println(rawy[m]);
-     }
-     exit(0);
-  }
+    } 
+   //Guarda valores en la memoria EEPROM
+   guardarDatoFloat(xoff,0);
+   guardarDatoFloat(yoff,4);
+   guardarDatoFloat(angulo,8);
+   guardarDatoFloat(factorEsc,12);
+   exit(0); 
+  } 
 }
-
-/*
-ConfiguraEscribePuenteH(0,0);
-     Serial.print("Valor final de i: "); Serial.println(i);
-     Serial.println("Cargando datos...");
-     delay(3000);
-     Serial.println("Datos para eje x ");
-     for (int j = 0; j <= numSamples; j = j + 1) {
-      Serial.println(rawx[j]);
-     }
-     Serial.println("Datos para eje y ");
-     for (int m = 0; m <= numSamples; m = m + 1) {
-      Serial.println(rawy[m]);
-     }
-     exit(0);
-*/
 
 bool Giro(float grados) {
 
@@ -652,4 +611,89 @@ float minF(float arrayData[]){
     }
   }
   return minV; 
+}
+
+void guardarDatoFloat(float dato,int dirPagInicial){
+    byte varr1; //primeros 8 bits para guardar en la EEPROM (LSB)
+    byte varr2; //ultimo 8 bits para guardar en la EEPROM (MSB)
+    byte varrDec; //parte decimal para guardar en la EEPROM
+    byte signo; // signo del numero
+    float dato2;
+    if (dato<0.0){
+      signo=1;
+      dato2=(-1*dato);
+    }
+    else{
+      signo=0;
+      dato2=dato;
+      } 
+    transfVar(dato2,varr1,varr2,varrDec);
+    eepromEscribe(dirEEPROM,dirPagInicial,varr1);
+    delay(100);
+    eepromEscribe(dirEEPROM,dirPagInicial+1,varr2);
+    delay(100);
+    eepromEscribe(dirEEPROM,dirPagInicial+2,varrDec);
+    delay(100);
+    eepromEscribe(dirEEPROM,dirPagInicial+3,signo);
+    delay(100);
+ }
+
+float leerDatoFloat(int dirPagInicial){
+    byte signo; //signo del numero, 1 para negativo, 0 para positivo
+    byte varr1; //primeros 8 bits para guardar en la EEPROM (LSB)
+    byte varr2; //ultimo 8 bits para guardar en la EEPROM (MSB)
+    byte varrDec; //parte decimal para guardar en la EEPROM
+    float dato;
+    varr1=eepromLectura(dirEEPROM,dirPagInicial);
+    varr2=eepromLectura(dirEEPROM,dirPagInicial+1);
+    varrDec=eepromLectura(dirEEPROM,dirPagInicial+2);
+    signo=eepromLectura(dirEEPROM,dirPagInicial+3);
+    if (signo==1){
+      dato=-1*constrVar(varr1,varr2,varrDec);
+      return dato;
+    }
+    else{
+      dato=constrVar(varr1,varr2,varrDec);
+      return dato;
+    }
+}
+
+float constrVar(byte LSB, byte MSB, byte dec){
+    int piv1,piv2;
+    float nuevo,decs;
+    piv1=LSB;
+    piv2=MSB<<8;
+    nuevo=piv1|piv2;
+    decs=float(dec);
+    nuevo=nuevo+decs/100;
+    return nuevo;
+  }
+void transfVar(float num,byte &var1,byte &var2,byte &varDec){
+    int nuevoNum=int(num);
+    int desplazamiento;
+    float dec;
+    desplazamiento=nuevoNum<<8;
+    var1=desplazamiento>>8; //LSB
+    var2=nuevoNum>>8; //MSB
+    dec=100*(num-nuevoNum);
+    varDec=int(dec);
+  }
+
+void eepromEscribe(byte dir, byte dirPag, byte data) {
+  myWire.beginTransmission(dir);
+  myWire.write(dirPag);
+  myWire.write(data);
+  myWire.endTransmission();
+}
+
+byte eepromLectura(int dir, int dirPag) {
+  myWire.beginTransmission(dir);
+  myWire.write(dirPag);
+  myWire.endTransmission();
+
+  myWire.requestFrom(dir, 1);
+  if(myWire.available())
+    return myWire.read();
+  else
+    return 0xFF;
 }
