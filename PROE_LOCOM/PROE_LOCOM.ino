@@ -3,6 +3,12 @@
 //https://github.com/jcbrenes/PROE
 
 #include<Wire.h> //Bilbioteca para la comunicacion I2C
+#include "wiring_private.h" // pinPeripheral() function
+ 
+TwoWire myWire(&sercom1, 11, 13);
+
+#define dirEEPROM B01010000 //Direccion de la memoria EEPROM
+#define addr 0x0D //I2C Address para el HMC5883
 
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
@@ -145,6 +151,8 @@ void setup() {
   Serial.begin(115200);
   Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
   Wire.onReceive(RecibirI2C);
+  pinPeripheral(11, PIO_SERCOM);
+  pinPeripheral(13, PIO_SERCOM);
   delay(2000);
 }
 
@@ -683,4 +691,89 @@ int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, fl
   errorAnteriorVel = errorVel;
   
   return  ((int)pidTermVel); 
+}
+
+void inicializaMagnet(){
+//Funcion que establece la comunicacion con el magnetometro, lo setea para una frecuencia de muestreo de 200 Hz
+//y en modo de medición continua
+  myWire.beginTransmission(addr); //start talking
+  myWire.write(0x0B); // Tell the HMC5883 to Continuously Measure
+  myWire.write(0x01); // Set the Register
+  myWire.endTransmission();
+  myWire.beginTransmission(addr); //start talking
+  myWire.write(0x09); // Tell the HMC5883 to Continuously Measure
+  myWire.write(0x1D); // Set the Register
+  myWire.endTransmission();
+}
+
+void medirMagnet(short &x,short &y,short &z){
+//Funcion que extrae los datos crudos del magnetometro, pasa los parametros por referencia y carga los valores de calibracion
+//desde la memoria eeprom, adicionalmente usa un filtro para la toma de datos (media movil)
+  myWire.beginTransmission(addr);
+  myWire.write(0x00); //start with register 3.
+  myWire.endTransmission();
+
+  //Pide 6 bytes del registro del magnetometro
+  myWire.requestFrom(addr, 6);
+  if (6 <= myWire.available()) {
+    x = myWire.read(); //LSB  x
+    x |= myWire.read() << 8; //MSB  x
+    y = myWire.read(); //LSB  y
+    y |= myWire.read() << 8; //MSB y
+    z = myWire.read(); //LSB z
+    z |= myWire.read() << 8; //MSB z
+  }
+}
+
+
+float leerDatoFloat(int dirPagInicial){
+//Funcion que lee datos flotantes de la memoria eeprom, pasa como parametro la posicion inicial
+//de memoria para comenzar a leer. Se leen los primeros 8 bits que serian LSB y luego los 8 bits correspondientes al MSB
+//luego se leen los 8 bits correspondientes a la parte decimal y por ultimo 8 bits que determinan el signo (==0 seria positivo e ==1 seria negativo)
+
+    byte signo; //signo del numero, 1 para negativo, 0 para positivo
+    byte varr1; //primeros 8 bits para guardar en la EEPROM (LSB)
+    byte varr2; //ultimo 8 bits para guardar en la EEPROM (MSB)
+    byte varrDec; //parte decimal para guardar en la EEPROM
+    float dato;
+    //Lee 4 posiciones de memoria a partir de la ingresada como parametro
+    varr1=eepromLectura(dirEEPROM,dirPagInicial);
+    varr2=eepromLectura(dirEEPROM,dirPagInicial+1);
+    varrDec=eepromLectura(dirEEPROM,dirPagInicial+2);
+    signo=eepromLectura(dirEEPROM,dirPagInicial+3);
+    //Agrega el signo
+    if (signo==1){
+      dato=-1*constrVar(varr1,varr2,varrDec);
+      return dato;
+    }
+    else{
+      dato=constrVar(varr1,varr2,varrDec);
+      return dato;
+    }
+}
+
+float constrVar(byte LSB, byte MSB, byte dec){
+//Funcion que "arma" un numero flotante a partir de sus 8 bits LSB, sus 8 bits MSB y 8 bits para la
+//parte decimal del numero, devuelve el numero reconstruido como flotante
+    int piv1,piv2;
+    float nuevo,decs;
+    piv1=LSB;
+    piv2=MSB<<8;
+    nuevo=piv1|piv2;
+    decs=float(dec);
+    nuevo=nuevo+decs/100;
+    return nuevo;
+}
+
+byte eepromLectura(int dir, int dirPag) {
+//Funcion que lee datos de la memoria eeprom, pasa como parametros la direccion del dispositivo (hexadecimal)
+//y la direccion de pagina donde se desea leer, devuelve el dato de 8 bits contenido en esa direccion
+  myWire.beginTransmission(dir);
+  myWire.write(dirPag);
+  myWire.endTransmission();
+  myWire.requestFrom(dir, 1);
+  if(myWire.available())
+    return myWire.read();
+  else
+    return 0xFF;
 }
