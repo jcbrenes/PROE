@@ -706,13 +706,14 @@ void inicializaMagnet(){
   myWire.endTransmission();
 }
 
-void medirMagnet(short &x,short &y,short &z){
+float medirMagnet(){
 //Funcion que extrae los datos crudos del magnetometro, pasa los parametros por referencia y carga los valores de calibracion
 //desde la memoria eeprom, adicionalmente usa un filtro para la toma de datos (media movil)
+//retorna el angulo en un rango de [0,+-180]
   myWire.beginTransmission(addr);
   myWire.write(0x00); //start with register 3.
   myWire.endTransmission();
-
+  short x,y,z;
   //Pide 6 bytes del registro del magnetometro
   myWire.requestFrom(addr, 6);
   if (6 <= myWire.available()) {
@@ -723,6 +724,13 @@ void medirMagnet(short &x,short &y,short &z){
     z = myWire.read(); //LSB z
     z |= myWire.read() << 8; //MSB z
   }
+  float angulo = atan2(y, x);
+    angulo=angulo*(180/M_PI);//convertimos de Radianes a grados
+    angulo=angulo-1.11; //corregimos la declinación magnética
+    //Mostramos el angulo entre el eje X y el Norte
+    Serial.print("AnguloX-N: ");
+    Serial.println(angulo,0);
+    delay(100);
 }
 
 
