@@ -1,0 +1,19 @@
+Proyecto PROE
+
+Guía de calibración de magnetómetro:
+
+1. Abrir el archivo Calibracion_Magnetometro.ino
+
+2. Cargar el código al robot SIN ENCENDERLO (solamente conectar el feather) y desconectarlo luego de que se cargue totalmente
+
+3. Posicionar el robot en un espacio plano donde pueda girar 360° sin ningún problema
+
+4. Verificar que no haya imanes, cables, metales u otros objetos que puedan ocasionar interferencias magnéticas externas
+
+5. Prender el robot y verificar que de una vuelta de 360° lentamente
+
+6. Una vez se detenga, esperar al menos 5 s antes de apagarlo
+
+7. Ya estarían almacenados los valores de calibración en la EEPROM
+
+8. ¡Calibración lista!
