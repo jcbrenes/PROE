@@ -42,4 +42,4 @@ Asistentes:
 - Joselyn Murillo Rodríguez joselyn.dmurillo97@gmail.com  
 - Bryan Alpízar Quesada bryan2300@gmail.com
 - Kevin Morales Paz kevinmoralespaz@gmail.com
-- Andrés 
+- Andrés Jiménez Mora andjm1428@gmail.com
