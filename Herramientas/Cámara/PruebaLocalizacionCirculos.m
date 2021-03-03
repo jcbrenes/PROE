@@ -18,15 +18,30 @@ RadioGrande=25; %25mm es el radio del círculo grande
 %píxeles ± un porcentaje (debe ajustarce de ser necesario). Se utiliza la función round para redondear el
 %resultado al entero más cercano, ya que no pueden existir fracciones de
 %píxeles.
-RminPequeno=round((RadioPequeno/mmPorPixel)*0.5)
+RminPequeno=round((RadioPequeno/mmPorPixel)*0.9)
 RmaxPequeno=round((RadioPequeno/mmPorPixel)*1.5)
 
 %Ahora se hace el mismo procedimiento para el círculo grande.
-RminGrande=round((RadioGrande/mmPorPixel)*0.75)
+RminGrande=round((RadioGrande/mmPorPixel)*1)
 RmaxGrande=round((RadioGrande/mmPorPixel)*1.5)
 
 %Prueba de búsqueda círculo pequeño
 %Dark se refiere a que el círculo es oscuro sobre un fondo claro.
+
+%Prueba 02 febrero 2020 INICIO (requiere su workspace)
+%Mejor combinación hasta ahora de multiplicadores: 1 y 2, pero detecta los
+%grandes.
+RminPequeno=round((RadioPequeno/mmPorPixel)*0.84)
+RmaxPequeno=round((RadioPequeno/mmPorPixel)*1.7)
+A = ImSuperpuesta; imshow(A)
+[centersDarkp, radiiDarkp] = imfindcircles(A,[RminPequeno RmaxPequeno],'ObjectPolarity','dark');
+viscircles(centersDarkp, radiiDarkp,'EdgeColor','b');
+
+%Prueba de búsqueda círculo grande
+[centersDarkg, radiiDarkg] = imfindcircles(A,[RminGrande RmaxGrande],'ObjectPolarity','dark');
+viscircles(centersDarkg, radiiDarkg,'EdgeColor','r');
+%FIN
+
 
 A = imread('ejemplo1(1).jpg'); imshow(A)
 [centersDarkp, radiiDarkp] = imfindcircles(A,[RminPequeno RmaxPequeno],'ObjectPolarity','dark');
