@@ -181,7 +181,7 @@ void setup() {
   direccionGlobal= (orientacionesRobot)(random(-1,2)*90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
   //Inicialización de puertos seriales
   Serial.begin(9600);
-  Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
+  Wire.begin(42); // En el puerto I2C se asigna esta dirección como esclavo
   Wire.onReceive(RecibirI2C);
   pinPeripheral(11, PIO_SERCOM);
   pinPeripheral(13, PIO_SERCOM);
@@ -433,7 +433,7 @@ void DeteccionObstaculo(){
 //Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
 //Son obstáculos que requieren que el robot cambie de dirección
 
-  if(giroTerminado==1){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
+  if(giroTerminado==1 && millis()>5000){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
    digitalWrite(13,HIGH);
    Serial.print("INT OBS!  ");
    Serial.print(datosSensores[ultimoObstaculo][3]);

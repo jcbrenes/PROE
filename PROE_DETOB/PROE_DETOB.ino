@@ -27,8 +27,8 @@ Servo myServo;
 #define lowBattery PB15 //Pin de batería baja del boost
 #define interruptor PA8 //Interruptor adicional, usar pullup de software
 #define led1 PB3 //Led adicional 1
-#define led2 PB4 //Led adicional 2
-#define led3 PB5 //Led adicional 3
+#define led2 PA3 //Led adicional 2
+#define led3 PA5 //Led adicional 3
 #define serv PB9 //Servo
 #define temp PB1 //Sensor de temperatura
 #define int1 PA4 //Pin de interrupción para la feather
@@ -57,6 +57,8 @@ int incremento=1; //cantidad de grados que aumenta el servo en cada movimiento
 bool ledON = false; 
 int onTime= 1000; //tiempo de encendido del LED en milisegundos
 unsigned long millisLED=0;
+
+int c=0; //Pulso de led para ver actividad del STM
 
 
 void setup() {
@@ -97,6 +99,14 @@ void loop() {
   //revisarTemperatura(); //desactivado mientras no está soldado el sensor al PCB
   revisarBateria();
   encenderLED(); //enciende un led si alguna función lo activó 
+  
+  if(c>5000){//Parpadea led amarillo para señalar actividad del código
+    digitalWrite(led2,!digitalRead(led2));//Pulsar led 13 si no ha llegado la señal de sincronización de base
+    c=0;
+  }
+  else{
+    c=c+1;
+  }
 }
 
 void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
