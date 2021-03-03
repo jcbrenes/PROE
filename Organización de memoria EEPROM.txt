@@ -1,0 +1,8 @@
+Proyecto PROE
+
+Organización de memoria EEPROM
+
+Dirección: 0-3 ; Dato: offset en x para magnetómetro
+Dirección: 4-7 ; Dato: offset en y para magnetómetro
+Dirección: 8-11 ; Dato: angulo para rotación de datos en magnetómetro
+Dirección: 12-15 ; Dato: factor de escalado para magnetómetro
