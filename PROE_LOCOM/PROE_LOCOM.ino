@@ -122,7 +122,7 @@ int anguloGiro = 0;
 
 //Variables para el magnetómetro y su calibración
 const float declinacionMag=0.0; //correccion del campo magnetico respecto al norte geográfico en Costa Rica
-const float alfa=0.2; //constante para filtro de datos
+const float alfa=1; //0.2; //constante para filtro de datos
 float xft,yft; //Valores filtrados
 float xoff=0; //offset de calibración en x
 float yoff=0; //offset de calibración en y
@@ -207,6 +207,7 @@ void loop(){
           RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
           AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
           estado= GIRO;
+          float x= medirMagnet(); Serial.print("Orientacion antes: ");  Serial.println(x);
         }
         
         case GIRO: {
@@ -216,6 +217,7 @@ void loop(){
             poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
             estado=AVANCE;
+            float x= medirMagnet(); Serial.print("Orientacion despues: "); Serial.println(x);
           }
         }
         
