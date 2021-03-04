@@ -167,8 +167,7 @@ void setup() {
 }
 
 void loop(){
-  
-//Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
+ //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
   if((micros()-tiempoActual)>=tiempoMuestreo){
      tiempoActual=micros();
     
@@ -716,14 +715,16 @@ void inicializaMagnet(){
 }
 
 float medirMagnet(){
-//Funcion que extrae los datos crudos del magnetometro, carga los valores de calibracion
-//desde la memoria eeprom, adicionalmente usa un filtro para la toma de datos (media movil)
-//retorna el angulo en un rango de [0,+-180]
+  //Funcion que extrae los datos crudos del magnetometro, carga los valores de calibracion
+  //desde la memoria eeprom, adicionalmente usa un filtro para la toma de datos (media movil)
+  //retorna el angulo en un rango de [0,+-180]
+  short x,y,z;
+  float xof,yof, xrot,yrot,xf,yf;
+  //Realiza un for parta tomar 15 mediciones basura buscando que se estabilice el filtro
+  for(int i=0;i<=15;i++){ 
   myWire.beginTransmission(addr);
   myWire.write(0x00); //start with register 3.
   myWire.endTransmission();
-  short x,y,z;
-  float xof,yof, xrot,yrot,xf,yf;
   //Pide 6 bytes del registro del magnetometro
   myWire.requestFrom(addr, 6);
   if (6 <= myWire.available()) {
@@ -737,6 +738,7 @@ float medirMagnet(){
   //Corrige los datos con base en los valores de la calibracion
   xft=x*alfa+(1-alfa)*xft;
   yft=y*alfa+(1-alfa)*yft;
+  }
   //Sustrae los offset
   xof=xft-xoff;
   yof=yft-yoff;
@@ -751,6 +753,7 @@ float medirMagnet(){
     xf=-1*cos(angulo)*xrot*factorEsc-yrot*sin(angulo);
     yf=-1*sin(angulo)*xrot*factorEsc+cos(angulo)*yrot;
     }
+  
   //Obtiene el alguno con respecto al norte
   float angulo = atan2(yf, xf);
     angulo=angulo*(180/PI);//convertimos de Radianes a grados
