@@ -122,7 +122,7 @@ int anguloGiro = 0;
 
 //Variables para el magnetómetro y su calibración
 const float declinacionMag=0.0; //correccion del campo magnetico respecto al norte geográfico en Costa Rica
-const float alfa=1; //0.2; //constante para filtro de datos
+const float alfa=0.2; //constante para filtro de datos
 float xft,yft; //Valores filtrados
 float xoff=0; //offset de calibración en x
 float yoff=0; //offset de calibración en y
