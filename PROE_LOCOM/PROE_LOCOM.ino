@@ -10,6 +10,10 @@ TwoWire myWire(&sercom1, 11, 13);
 #define dirEEPROM B01010000 //Direccion de la memoria EEPROM
 #define addr 0x0D //I2C Address para el HMC5883
 
+//Radios de conversión según data sheet
+#define A_R 16384.0
+#define G_R 131.0
+
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
 const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
@@ -156,6 +160,7 @@ void setup() {
   pinPeripheral(11, PIO_SERCOM);
   pinPeripheral(13, PIO_SERCOM);
   inicializaMagnet();
+  inicializarMPU();
   Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
   Wire.onReceive(RecibirI2C);
   //Carga los valores de calibración del magnetometro
@@ -811,4 +816,48 @@ byte eepromLectura(int dir, int dirPag) {
     return myWire.read();
   else
     return 0xFF;
+}
+
+//Inicializa la comunicación con el MPU
+void inicializarMPU(){
+  myWire.beginTransmission(0x68); //empezar comunicacion con el mpu6050
+  myWire.write(0x6B);   //escribir en la direccion 0x6B
+  myWire.write(0x00);   //escribe 0 en la direccion 0x6B (arranca el sensor)
+  myWire.endTransmission();   //termina escritura
+  }
+
+//Funcione que extrae los datos crudos del MPU
+void leeMPU(){
+  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z;
+  
+  myWire.beginTransmission(0x68);   //empieza a comunicar con el mpu6050
+  myWire.write(0x3B);   //envia byte 0x43 al sensor para indicar startregister
+  myWire.endTransmission();   //termina comunicacion
+  myWire.requestFrom(0x68,14); //pide 6 bytes al sensor, empezando del reg 43 (ahi estan los valores del giro)
+
+  ac_x = myWire.read()<<8 | myWire.read();
+  ac_y = myWire.read()<<8 | myWire.read();
+  ac_z = myWire.read()<<8 | myWire.read();
+
+  tmp = myWire.read()<<8 | myWire.read();
+
+  gyro_x = myWire.read()<<8 | myWire.read(); //combina los valores del registro 44 y 43, desplaza lo del 43 al principio
+  gyro_y = myWire.read()<<8 | myWire.read();
+  gyro_z = myWire.read()<<8 | myWire.read();
+
+  Serial.print("acel x = ");
+  Serial.print(ac_x);
+  Serial.print("y = ");
+  Serial.print(ac_y);
+  Serial.print("z = ");
+  Serial.println(ac_z);
+
+  Serial.print("gyro x = ");
+  Serial.print(gyro_x);
+  Serial.print("y = ");
+  Serial.print(gyro_y);
+  Serial.print("z = ");
+  Serial.println(gyro_z);
+
+  delay(500); //espere 250ms
 }
