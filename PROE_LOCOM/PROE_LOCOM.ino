@@ -15,7 +15,7 @@ TwoWire myWire(&sercom1, 11, 13);
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
 const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
-const int factorEncoder=4; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
+const int factorEncoder=2; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
 const float circunferenciaRueda=139.5;//Circunferencia de la rueda = 139.5mm 
 const float pulsosPorMilimetro=((float)factorEncoder*pulsosPorRev)/circunferenciaRueda; 
 const float distanciaCentroARueda=87.5;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
@@ -142,8 +142,8 @@ RH_RF69 rf69(RFM69_CS, RFM69_INT); // Inicialización del driver de la bibliotec
 
 //Variables para el mensaje que se va a transmitir a la base
 
-uint8_t cantidadRobots = 1; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN]; //Buffer para recibir mensajes.
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
@@ -158,6 +158,7 @@ uint32_t* ptrMensaje; //Puntero para descomponer el float en bytes.
 const uint8_t timeOffset = 2; //Offset que existe entre el máster enviando y el nodo recibiendo.
 
 int c=0; //Contador para led 13
+int b=0;
 
 void setup() {
   //asignación de pines
@@ -168,11 +169,15 @@ void setup() {
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
   pinMode(INT_OBSTACULO, INPUT_PULLUP);
+
+  pinMode(ENC_DER_C1, INPUT); //Declarar pines C1 de encoder como entradas al no usarse como interrupción
+  pinMode(ENC_IZQ_C1, INPUT);
+  
   delay(1000); //delay para evitar interrupciones al arrancar
   //asignación de interrupciones
-  attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
+  //attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
   attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
-  attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
+  //attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
   attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
   attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
   //temporización y varibales aleatorias
@@ -182,7 +187,7 @@ void setup() {
   //Inicialización de puertos seriales
   Serial.begin(9600);
   Wire.begin(42); // En el puerto I2C se asigna esta dirección como esclavo
-  Wire.onReceive(RecibirI2C);
+  //Wire.onReceive(RecibirI2C);
   pinPeripheral(11, PIO_SERCOM);
   pinPeripheral(13, PIO_SERCOM);
 
@@ -239,43 +244,12 @@ void setup() {
 }
 
 void loop(){
-  while(!timeReceived){//Espera mensaje de sincronización de la base
-      uint8_t len = sizeof(buf);                                                  //Obtengo la longitud máxima del mensaje a recibir
-      if(rf69.recv(buf, &len, timeStamp1)){                                       //Llamo a recv() si recibí algo. El timeStamp1 guarda el valor del RTC del nodo en el momento en que comienza a procesar el mensaje.
-        Serial.println("¡Reloj del máster clock recibido!");
-        buf[len] = 0;                                                             //Limpio el resto del buffer.
-        data = buf[3] << 24 | buf[2] << 16 | buf[1] << 8 | buf[0];                //Construyo el dato con base en el buffer y haciendo corrimiento de bits.
-        timeStamp2 = RTC->MODE0.COUNT.reg;                                        //Una vez procesado el mensaje del reloj del máster, guardo otra estampa de tiempo para eliminar este tiempo de procesamiento. 
-        unsigned long masterClock = data + (timeStamp2-timeStamp1) + timeOffset;  //Calculo reloj del master como: lo enviado por el máster (data) + lo que dura el mensaje en llegarme (timeOffset) + lo que duré procesando el mensaje (tS2-tS1).
-        RTC->MODE0.COUNT.reg = masterClock;                                       //Seteo el RTC del nodo al tiempo del master.     
-        RTC->MODE0.COMP[0].reg = masterClock + idRobot*tiempoRobotTDMA + 50;      //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
-        while(RTCisSyncing());                                                    //Espero la sincronización. 
-        
-        timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
-      }
-      /*
-      if(c>50000){
-        digitalWrite(13,!digitalRead(13));//Pulsar led 13 si no ha llegado la señal de sincronización de base
-        c=0;
-      }
-      else{
-        c=c+1;
-      }
-      */
-  }
-/*
-  if(c>400000){
-    digitalWrite(13,!digitalRead(13));//Pulsar led 13 para ver que el loop sigue corriendo
-    c=0;
-  }
-  else{
-    c=c+1;
-  }
-*/
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
   if((micros()-tiempoActual)>=tiempoMuestreo){
      tiempoActual=micros();
-    
+     
      //Máquina de estados que cambia el modo de operación
      switch (estado) {
   
@@ -316,7 +290,7 @@ void loop(){
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
           if(giroTerminado){
-            digitalWrite(13,LOW);
+            //digitalWrite(13,LOW);
             poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
             estado=AVANCE;
@@ -434,7 +408,7 @@ void DeteccionObstaculo(){
 //Son obstáculos que requieren que el robot cambie de dirección
 
   if(giroTerminado==1 && millis()>5000){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
-   digitalWrite(13,HIGH);
+   //digitalWrite(13,HIGH);
    Serial.print("INT OBS!  ");
    Serial.print(datosSensores[ultimoObstaculo][3]);
    Serial.print("  d: ");
@@ -698,30 +672,27 @@ void ResetContadoresEncoders(){
 
 void PulsosRuedaDerechaC1(){
 //Manejo de interrupción del canal C1 del encoder de la rueda derecha
-  if(millis()>5000){ //Desactivar interrupcion al inicio para evitar error en sincronización con base
-    LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
-  }
+  //LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
+  LecturaEncoder2(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
+
 }
 
 void PulsosRuedaDerechaC2(){
 //Manejo de interrupción del canal C2 del encoder de la rueda derecha
-  if(millis()>5000){ //Desactivar interrupcion al inicio para evitar error en sincronización con base
-    LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
-  }
+  //LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
+  LecturaEncoder2(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
 }
 
 void PulsosRuedaIzquierdaC1(){
 //Manejo de interrupción del canal C1 del encoder de la rueda izquierda
-  if(millis()>5000){ //Desactivar interrupcion al inicio para evitar error en sincronización con base
-    LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
-  }
+  //LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
+  LecturaEncoder2(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
 }
 
 void PulsosRuedaIzquierdaC2(){
 //Manejo de interrupción del canal C2 del encoder de la rueda izquierda
-  if(millis()>5000){ //Desactivar interrupcion al inicio para evitar error en sincronización con base
-    LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
-  }
+  //LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
+  LecturaEncoder2(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
 }
 
 void LecturaEncoder(int entradaA, int entradaB, byte& state, int& contGiro){
@@ -766,6 +737,52 @@ void LecturaEncoder(int entradaA, int entradaB, byte& state, int& contGiro){
     {
       if (statePrev == 1) contGiro--;
       if (statePrev == 3) contGiro++;
+    }
+  }
+}
+
+void LecturaEncoder2(int entradaA, int entradaB, byte& state, int& contGiro){ //Funcion de lectura de encoders con un solo interrupt en C2
+//Función que determina si el motor está avanzando o retrocediendo en función del estado de las salidas del encoder y el estado anterior
+//Modifica la variable contadora de pulsos de ese motor
+
+  //se almacena el valor actual del estado
+  byte statePrev = state;
+
+  //lectura de los encoders
+  int A = digitalRead(entradaA); //C1
+  int B = digitalRead(entradaB); //C2
+
+  //se define el nuevo estado
+  if ((A==HIGH)&&(B==HIGH)) state = 1;
+  if ((A==HIGH)&&(B==LOW)) state = 2;
+  if ((A==LOW)&&(B==LOW)) state = 3;
+  if ((A==LOW)&&(B==HIGH)) state = 4;
+
+  //Se aumenta o decrementa el contador de giro en base al estado actual y el anterior
+  switch (state)
+  {
+    case 1:
+    {
+      if (statePrev == 3) contGiro--;
+      if (statePrev == 2) contGiro++;
+      break;
+    }
+    case 2:
+    {
+      if (statePrev == 4) contGiro++;
+      if (statePrev == 1) contGiro--;
+      break;
+    }
+    case 3:
+    {
+      if (statePrev == 4) contGiro++;
+      if (statePrev == 1) contGiro--;
+      break;
+    }
+    default:
+    {
+      if (statePrev == 3) contGiro--;
+      if (statePrev == 2) contGiro++;
     }
   }
 }
@@ -957,6 +974,25 @@ byte eepromLectura(int dir, int dirPag) {
 }
 
 /**** RTC FUNCIONES****/
+void sincronizacion(){
+  while(!timeReceived){//Espera mensaje de sincronización de la base
+    uint8_t len = sizeof(buf);                                                  //Obtengo la longitud máxima del mensaje a recibir
+    if(rf69.recv(buf, &len, timeStamp1)){                                       //Llamo a recv() si recibí algo. El timeStamp1 guarda el valor del RTC del nodo en el momento en que comienza a procesar el mensaje.
+      Serial.println("¡Reloj del máster clock recibido!");
+      buf[len] = 0;                                                             //Limpio el resto del buffer.
+      data = buf[3] << 24 | buf[2] << 16 | buf[1] << 8 | buf[0];                //Construyo el dato con base en el buffer y haciendo corrimiento de bits.
+      timeStamp2 = RTC->MODE0.COUNT.reg;                                        //Una vez procesado el mensaje del reloj del máster, guardo otra estampa de tiempo para eliminar este tiempo de procesamiento. 
+      unsigned long masterClock = data + (timeStamp2-timeStamp1) + timeOffset;  //Calculo reloj del master como: lo enviado por el máster (data) + lo que dura el mensaje en llegarme (timeOffset) + lo que duré procesando el mensaje (tS2-tS1).
+      RTC->MODE0.COUNT.reg = masterClock;                                       //Seteo el RTC del nodo al tiempo del master.     
+      RTC->MODE0.COMP[0].reg = masterClock + idRobot*tiempoRobotTDMA + 50;      //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
+      while(RTCisSyncing());                                                    //Espero la sincronización. 
+      
+      timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
+      Wire.onReceive(RecibirI2C);
+    }
+  }
+}
+
 inline bool RTCisSyncing(){
   //Función que lee el bit de sincronización de los registros
   return (RTC->MODE0.STATUS.bit.SYNCBUSY);

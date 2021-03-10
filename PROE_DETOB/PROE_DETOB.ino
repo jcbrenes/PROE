@@ -37,11 +37,11 @@ Servo myServo;
 
 //Constantes de configuración//
 const float beta=0.1;  //Constante para el filtro, ajustar para cambiar el comportamiento
-const int servoDelay=10; //Tiempo entre cada paso del servo en milisegundos
+const int servoDelay=5; //Tiempo entre cada paso del servo en milisegundos
 const float distanciaMinimaSharp=130; //Distancia mínima en milimetros para detección de obstáculos
 const int debounceTime=400; //Debounce para sensor IR frontal
 const float maxTemp=50; //Temperatura de detección de fuego
-const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el servo que rota el sharp
+const int movimientoMaximo=110; //Maxima rotacion en grados realizada por el servo que rota el sharp
 
 //Variables globales//
 int angulo=0;
@@ -89,6 +89,7 @@ void setup() {
   Serial1.begin(115200);  //Inicia la comunicación serial a 115200 baud
   Serial1.println("On");  //Enviar un "on" por el serial para confirmar que el setup se ejecutó correctamente
 
+  myServo.write(movimientoMaximo/2); //Coloca el servo en el centro para confirmar alineación
   delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
 }
  
@@ -99,14 +100,8 @@ void loop() {
   //revisarTemperatura(); //desactivado mientras no está soldado el sensor al PCB
   revisarBateria();
   encenderLED(); //enciende un led si alguna función lo activó 
+  actividad(); //Parpadea led amarillo para confirmar actividad del stm
   
-  if(c>5000){//Parpadea led amarillo para señalar actividad del código
-    digitalWrite(led2,!digitalRead(led2));//Pulsar led 13 si no ha llegado la señal de sincronización de base
-    c=0;
-  }
-  else{
-    c=c+1;
-  }
 }
 
 void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
@@ -209,6 +204,16 @@ void enviarDato(int caso, int distancia, int angulo){ //Envia el paquete de dato
   onTime=1000;
   Serial1.println(dato);
   
+}
+
+void actividad(){
+  if(c>5000){//Parpadea led amarillo para señalar actividad del stm
+    digitalWrite(led2,!digitalRead(led2));
+    c=0;
+  }
+  else{
+    c=c+1;
+  }
 }
 
 //Funciones de interrupción//
