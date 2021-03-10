@@ -12,6 +12,10 @@ TwoWire myWire(&sercom1, 11, 13);
 #define dirEEPROM B01010000 //Direccion de la memoria EEPROM
 #define addr 0x0D //I2C Address para el HMC5883
 
+//Radios de conversión según data sheet
+#define A_R 16384.0
+#define G_R 131.0
+
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
 const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
@@ -122,11 +126,14 @@ enum orientacionesRobot {ADELANTE=0, DERECHA=90, IZQUIERDA=-90, ATRAS=180}; //Se
 orientacionesRobot direccionGlobal = ADELANTE; //Se inicializa Adelante, pero en Setup se asignará un valor random
 int anguloGiro = 0;
 
-//Variables para la calibración
-float alfaIzq=1;
-float betaIzq=0;
-float alfaDer=1;
-float betaDer=0;
+//Variables para el magnetómetro y su calibración
+const float declinacionMag=0.0; //correccion del campo magnetico respecto al norte geográfico en Costa Rica
+const float alfa=0.2; //constante para filtro de datos
+float xft,yft; //Valores filtrados
+float xoff=0; //offset de calibración en x
+float yoff=0; //offset de calibración en y
+float angulo=0; //angulo del elipsoide que forman los datos
+float factorEsc=1; //factor para convertir el elipsoide en una circunferencia
 
 //Variables para la comunicación por radio frecuencia
 #define RF69_FREQ      915.0  //La frecuencia debe ser la misma que la de los demas nodos.
@@ -180,17 +187,28 @@ void setup() {
   //attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
   attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
   attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
-  //temporización y varibales aleatorias
+   //temporización y varibales aleatorias
   tiempoActual=micros(); //para temporización de los ciclos
   randomSeed(analogRead(A5)); //Para el algoritmo de exploración, el pinA5 está al aire
   direccionGlobal= (orientacionesRobot)(random(-1,2)*90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
   //Inicialización de puertos seriales
-  Serial.begin(9600);
-  Wire.begin(42); // En el puerto I2C se asigna esta dirección como esclavo
-  //Wire.onReceive(RecibirI2C);
+
+  Serial.begin(115200);
+  myWire.begin();
   pinPeripheral(11, PIO_SERCOM);
   pinPeripheral(13, PIO_SERCOM);
-
+  inicializaMagnet();
+  inicializarMPU();
+  Wire.begin(42); // En el puerto I2c se asigna esta dirección como esclavo
+  Wire.onReceive(RecibirI2C);
+  
+  //Carga los valores de calibración del magnetometro
+  xoff=leerDatoFloat(0);
+  yoff=leerDatoFloat(4);
+  angulo=leerDatoFloat(8);
+  factorEsc=leerDatoFloat(12);
+  
+  
   pinMode(RFM69_RST, OUTPUT);
   digitalWrite(RFM69_RST, LOW);
 
@@ -247,6 +265,7 @@ void loop(){
   sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
   
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
+
   if((micros()-tiempoActual)>=tiempoMuestreo){
      tiempoActual=micros();
      
@@ -285,6 +304,7 @@ void loop(){
           RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
           AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
           estado= GIRO;
+          float x= medirMagnet(); Serial.print("Orientacion antes: ");  Serial.println(x);
         }
         
         case GIRO: {
@@ -294,6 +314,7 @@ void loop(){
             poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
             estado=AVANCE;
+            float x= medirMagnet(); Serial.print("Orientacion despues: "); Serial.println(x);
           }
         }
         
@@ -566,30 +587,26 @@ int ControlPosGiroRueda( float posRef, float posActual, float& sumErrorGiro, flo
 
 void ConfiguraEscribePuenteH (int pwmRuedaDer, int pwmRuedaIzq){
   
-//Determina los valores de pwm corregidos según la calibración
-  int pwmRuedaIzqCorr=alfaIzq*pwmRuedaIzq+betaIzq; 
-  int pwmRuedaDerCorr=alfaDer*pwmRuedaDer+betaDer;
-  
 //Determina si es giro, avance, o retroceso en base a los valores de PWM y configura los pines del Puente H  
-  if (pwmRuedaDerCorr>=0 && pwmRuedaIzqCorr>=0){
+  if (pwmRuedaDer>=0 && pwmRuedaIzq>=0){
     ConfiguracionAvanzar();
-    analogWrite(PWMB, pwmRuedaDerCorr);
-    analogWrite(PWMA, pwmRuedaIzqCorr);
+    analogWrite(PWMB, pwmRuedaDer);
+    analogWrite(PWMA, pwmRuedaIzq);
     
-  }else if (pwmRuedaDerCorr<0 && pwmRuedaIzqCorr<0){
+  }else if (pwmRuedaDer<0 && pwmRuedaIzq<0){
     ConfiguracionRetroceder();
-    analogWrite(PWMB, -pwmRuedaDerCorr);
-    analogWrite(PWMA, -pwmRuedaIzqCorr);
+    analogWrite(PWMB, -pwmRuedaDer);
+    analogWrite(PWMA, -pwmRuedaIzq);
     
-  }else if (pwmRuedaDerCorr>0 && pwmRuedaIzqCorr<0){
+  }else if (pwmRuedaDer>0 && pwmRuedaIzq<0){
     ConfiguracionGiroDerecho();
-    analogWrite(PWMB, pwmRuedaDerCorr);
-    analogWrite(PWMA, -pwmRuedaIzqCorr);
+    analogWrite(PWMB, pwmRuedaDer);
+    analogWrite(PWMA, -pwmRuedaIzq);
     
-  }else if (pwmRuedaDerCorr<0 && pwmRuedaIzqCorr>0){
+  }else if (pwmRuedaDer<0 && pwmRuedaIzq>0){
     ConfiguracionGiroIzquierdo();
-    analogWrite(PWMB, -pwmRuedaDerCorr);
-    analogWrite(PWMA, pwmRuedaIzqCorr);
+    analogWrite(PWMB, -pwmRuedaDer);
+    analogWrite(PWMA, pwmRuedaIzq);
   }
 }
 
@@ -901,13 +918,17 @@ void inicializaMagnet(){
   myWire.endTransmission();
 }
 
-void medirMagnet(short &x,short &y,short &z){
-//Funcion que extrae los datos crudos del magnetometro, pasa los parametros por referencia y carga los valores de calibracion
-//desde la memoria eeprom, adicionalmente usa un filtro para la toma de datos (media movil)
+float medirMagnet(){
+  //Funcion que extrae los datos crudos del magnetometro, carga los valores de calibracion
+  //desde la memoria eeprom, adicionalmente usa un filtro para la toma de datos (media movil)
+  //retorna el angulo en un rango de [0,+-180]
+  short x,y,z;
+  float xof,yof, xrot,yrot,xf,yf;
+  //Realiza un for parta tomar 15 mediciones basura buscando que se estabilice el filtro
+  for(int i=0;i<=15;i++){ 
   myWire.beginTransmission(addr);
   myWire.write(0x00); //start with register 3.
   myWire.endTransmission();
-
   //Pide 6 bytes del registro del magnetometro
   myWire.requestFrom(addr, 6);
   if (6 <= myWire.available()) {
@@ -918,6 +939,31 @@ void medirMagnet(short &x,short &y,short &z){
     z = myWire.read(); //LSB z
     z |= myWire.read() << 8; //MSB z
   }
+  //Corrige los datos con base en los valores de la calibracion
+  xft=x*alfa+(1-alfa)*xft;
+  yft=y*alfa+(1-alfa)*yft;
+  }
+  //Sustrae los offset
+  xof=xft-xoff;
+  yof=yft-yoff;
+  //Rotación y escalamiento de los datos
+  xrot=xof*cos(-angulo)-yof*sin(-angulo);
+  yrot=xof*sin(-angulo)+yof*cos(-angulo);
+  if (factorEsc>0){
+    xf=cos(angulo)*xrot-yrot*sin(angulo)*factorEsc;
+    yf=sin(angulo)*xrot+cos(angulo)*yrot*factorEsc;
+    }
+  else{
+    xf=-1*cos(angulo)*xrot*factorEsc-yrot*sin(angulo);
+    yf=-1*sin(angulo)*xrot*factorEsc+cos(angulo)*yrot;
+    }
+  
+  //Obtiene el alguno con respecto al norte
+  float angulo = atan2(yf, xf);
+    angulo=angulo*(180/PI);//convertimos de Radianes a grados
+    angulo=angulo-declinacionMag; //corregimos la declinación magnética
+    //Mostramos el angulo entre el eje X y el Norte
+    return angulo;
 }
 
 
@@ -972,6 +1018,7 @@ byte eepromLectura(int dir, int dirPag) {
   else
     return 0xFF;
 }
+
 
 /**** RTC FUNCIONES****/
 void sincronizacion(){
@@ -1061,4 +1108,48 @@ void RTC_Handler(void){
     
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }
+
+//Inicializa la comunicación con el MPU
+void inicializarMPU(){
+  myWire.beginTransmission(0x68); //empezar comunicacion con el mpu6050
+  myWire.write(0x6B);   //escribir en la direccion 0x6B
+  myWire.write(0x00);   //escribe 0 en la direccion 0x6B (arranca el sensor)
+  myWire.endTransmission();   //termina escritura
+  }
+
+//Funcione que extrae los datos crudos del MPU
+void leeMPU(){
+  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z;
+  
+  myWire.beginTransmission(0x68);   //empieza a comunicar con el mpu6050
+  myWire.write(0x3B);   //envia byte 0x43 al sensor para indicar startregister
+  myWire.endTransmission();   //termina comunicacion
+  myWire.requestFrom(0x68,14); //pide 6 bytes al sensor, empezando del reg 43 (ahi estan los valores del giro)
+
+  ac_x = myWire.read()<<8 | myWire.read();
+  ac_y = myWire.read()<<8 | myWire.read();
+  ac_z = myWire.read()<<8 | myWire.read();
+
+  tmp = myWire.read()<<8 | myWire.read();
+
+  gyro_x = myWire.read()<<8 | myWire.read(); //combina los valores del registro 44 y 43, desplaza lo del 43 al principio
+  gyro_y = myWire.read()<<8 | myWire.read();
+  gyro_z = myWire.read()<<8 | myWire.read();
+
+  Serial.print("acel x = ");
+  Serial.print(ac_x);
+  Serial.print("y = ");
+  Serial.print(ac_y);
+  Serial.print("z = ");
+  Serial.println(ac_z);
+
+  Serial.print("gyro x = ");
+  Serial.print(gyro_x);
+  Serial.print("y = ");
+  Serial.print(gyro_y);
+  Serial.print("z = ");
+  Serial.println(gyro_z);
+
+  delay(500); //espere 250ms
+
 }

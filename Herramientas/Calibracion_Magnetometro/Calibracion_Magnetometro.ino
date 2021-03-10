@@ -210,7 +210,7 @@ void loop() {
       factorEsc=(maxX-minX)/(maxY-minY);
     }
     else{
-      factorEsc=(maxY-minY)/(maxX-minX);
+      factorEsc=-1*(maxY-minY)/(maxX-minX);
     } 
    //Guarda valores en la memoria EEPROM
    guardarDatoFloat(xoff,0);
