@@ -10,7 +10,7 @@ TwoWire myWire(&sercom1, 11, 13);
 #define dirEEPROM B01010000 //Direccion de la memoria EEPROM
 #define addr 0x0D //I2C Address para el HMC5883
 
-//Radios de conversión según data sheet
+//Radios de conversión según data sheet del MPU6050
 #define A_R 16384.0
 #define G_R 131.0
 
@@ -133,6 +133,10 @@ float yoff=0; //offset de calibración en y
 float angulo=0; //angulo del elipsoide que forman los datos
 float factorEsc=1; //factor para convertir el elipsoide en una circunferencia
 
+//Variables para el MPU6050
+long tiempoPrev=0;
+float gir_ang_xPrev,gir_ang_yPrev,gir_ang_zPrev;
+
 void setup() {
   //asignación de pines
   pinMode(PWMA, OUTPUT);
@@ -172,8 +176,7 @@ void setup() {
 }
 
 void loop(){
- //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
-  if((micros()-tiempoActual)>=tiempoMuestreo){
+    if((micros()-tiempoActual)>=tiempoMuestreo){
      tiempoActual=micros();
     
      //Máquina de estados que cambia el modo de operación
@@ -826,10 +829,15 @@ void inicializarMPU(){
   myWire.endTransmission();   //termina escritura
   }
 
-//Funcione que extrae los datos crudos del MPU
+//Funcione que extrae los datos crudos del MPU, los calibra y calcula desplazamiento angulares
 void leeMPU(){
-  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z;
-  
+  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos
+  float gx,gy,gz,ax,ay,az; //guardan los valores reales de aceleración y velocidad angular
+  float gir_ang_x,gir_ang_y,gir_ang_z;
+  long dt; //delta de tiempo para calcular desplazamiento angular
+  if (tiempoPrev==0){
+    tiempoPrev=millis();
+    }
   myWire.beginTransmission(0x68);   //empieza a comunicar con el mpu6050
   myWire.write(0x3B);   //envia byte 0x43 al sensor para indicar startregister
   myWire.endTransmission();   //termina comunicacion
@@ -844,20 +852,31 @@ void leeMPU(){
   gyro_x = myWire.read()<<8 | myWire.read(); //combina los valores del registro 44 y 43, desplaza lo del 43 al principio
   gyro_y = myWire.read()<<8 | myWire.read();
   gyro_z = myWire.read()<<8 | myWire.read();
+  
+  dt = millis()-tiempoPrev;
+  tiempoPrev=millis();
+  
+  //Divide los datos entre sus ganancias
+  ax=(ac_x/A_R)*(9.81); //metros por segundo cuadrado
+  ay=(ac_y/A_R)*(9.81);
+  az=(ac_z/A_R)*(9.81);
+  gx=gyro_x/G_R; //grados por segundo
+  gy=gyro_y/G_R;
+  gz=gyro_z/G_R;
 
-  Serial.print("acel x = ");
-  Serial.print(ac_x);
-  Serial.print("y = ");
-  Serial.print(ac_y);
-  Serial.print("z = ");
-  Serial.println(ac_z);
-
+  gir_ang_x = gx*(dt/1000.0) + gir_ang_xPrev;
+  gir_ang_y = gy*(dt/1000.0) + gir_ang_yPrev;
+  gir_ang_z = gz*(dt/1000.0) + gir_ang_zPrev;
+  
+  gir_ang_xPrev=gir_ang_x;
+  gir_ang_yPrev=gir_ang_y;
+  gir_ang_zPrev=gir_ang_z;
+  
   Serial.print("gyro x = ");
-  Serial.print(gyro_x);
+  Serial.print(gir_ang_x);
   Serial.print("y = ");
-  Serial.print(gyro_y);
+  Serial.print(gir_ang_y);
   Serial.print("z = ");
-  Serial.println(gyro_z);
-
-  delay(500); //espere 250ms
+  Serial.println(gir_ang_z);
+  delay(100);
 }
