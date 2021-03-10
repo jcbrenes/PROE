@@ -1,3 +1,6 @@
+//Código de feather base que recibe datos de los robots en el campo y los envia por usb al puerto serial en el formato predefinido
+
+
 #include <SPI.h>
 #include <RH_RF69.h>
 #include <RHReliableDatagram.h>
@@ -17,6 +20,8 @@ RHReliableDatagram rf69_manager(rf69, MY_ADDRESS);
 
 unsigned long timeStamp1;
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+
+int c=0;
 
 void setup() 
 {
@@ -66,6 +71,8 @@ void setup()
     reloj[i] = *ptrReloj >> i*8;  //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
   }
   rf69_manager.sendtoWait(reloj, sizeof(reloj), 4);     //Enviar valor del RTC al esclavo
+  //Esta función envia un solo mensaje y asume que todos los esclavos la reciben al mismo tiempo en la misma dirección
+  //Podria ocasionar problemas si uno de los robot no recibe la señal requeriria un reinicio de todo el sistema
 }
 
 
@@ -73,9 +80,19 @@ void loop() {
   uint8_t len = sizeof(buf);
 
   if (rf69.recv(buf, &len, timeStamp1)) {
-    if (!len) return;
+    if ((*(float*)&buf[0])==0) return; //Si el ID es 0 no lo muestra, evita enviar un array vacio a consola
     buf[len] = 0;
     Serial.print(*(float*)&buf[0]); Serial.print("; "); Serial.print(*(float*)&buf[4]); Serial.print("; "); Serial.print(*(float*)&buf[8]); Serial.print("; "); Serial.print(*(float*)&buf[12]); Serial.print("; "); Serial.print(*(float*)&buf[16]); Serial.print("; "); Serial.print(*(float*)&buf[20]); Serial.print("; "); Serial.print(*(float*)&buf[24]); Serial.println(";");
   }
-  
+  actividad();
+}
+
+void actividad(){  //Pulsar led 13 para mostrar actividad del feather
+  if(c>100000){
+    digitalWrite(13,!digitalRead(13));
+    c=0;
+  }
+  else{
+    c=c+1;
+  }
 }

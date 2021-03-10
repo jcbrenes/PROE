@@ -12,14 +12,15 @@
 %Home/Add-Ons y buscar webcam.
 
 
-%--------------Etapa de captura de imágenes
+%--------------Etapa de captura de imágenes--------------------------
+%En las imágenes debe aparecer el patrón de calibración (rectangular de cuadrados de 40x40mm)
 clear cam;
 CantidadEjemplosCaptura=1; %Esta es la cantidad de distintas mediciones que se tomarán 
 tamanoCuadroMedicion=40;
 for img= 1:CantidadEjemplosCaptura
     cam=webcam(2);%Selecciona la camara USB
     %cam.Resolution='640x480'; %Es la resolución máxima de la cámara (DroidCam)
-    cam.Resolution='1920x1080'; %Es la resolución máxima de la cámara (DroidCam)
+    cam.Resolution='1920x1080'; %Es la resolución máxima de la cámara (USB)
     h = msgbox('Capture Imagen');
     for j=1:2
         filename=strcat('ejemplo',num2str(img),'(',num2str(j),').jpg');
@@ -36,38 +37,80 @@ for img= 1:CantidadEjemplosCaptura
     
     %ejemplo corresponde al nombre de la imagen, carga el ejemplo 5(1).jpg y el
     %ejemplo 5(2).jpg.
-
+    
+    %Carga la imagen con el nombre especificado por ejemplo y su índice en
+    %Im1
     Im1=imread(strcat('ejemplo',num2str(img),'(1).jpg'));
     %Requiere la conversión del espacio de color rgb que corresponde a 3
     %matrices, una del color rojo, una del verde y otra del azul a una sola
     %matriz en intensidad de grises.
-   
+    
+    
+    %Carga la imagen con el nombre especificado por ejemplo y su índice en
+    %Im2
     Im2=imread(strcat('ejemplo',num2str(img),'(2).jpg'));
+    
     %Leer la imagen a medir
     imOrig = Im1;
-
-    points = detectCheckerboardPoints(imOrig);
+    
+    %Esta parte del código requiere que el patrón de cuadrados de 40x40mm
+    %aparezcan en la imagen, para poder quitar su distorsión.
+    
+    %ImPrueba es una de las imágenes de calibración, se utilizará aquí
+    %de forma provisional.
+    
+    %COMENTAR LÍNEA SIGUIENTE CUANDO SE TENGAN NUEVOS EJEMPLOS
+    ImPrueba=imread(strcat('Image','(1).png'));
+    
+    %CAMBIAR ImPrueba por imOrig, después de tomar nuevos ejemplos.
+    
+    %De aquí en adelante se trabaja con im, que es la imagen con la distorsión
+    %eliminada.
+    points = detectCheckerboardPoints(ImPrueba);
     [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
-    [im, newOrigin] = undistortImage(imOrig, params, 'OutputView', 'full');
+    [im, newOrigin] = undistortImage(ImPrueba, params, 'OutputView', 'full');
     undistortedPoints = [undistortedPoints(:,1) - newOrigin(1), undistortedPoints(:,2) - newOrigin(2)];
     %Los pasos anteriores corresponden a la eliminación de la distorsión de
-    %la imagen, se utilizó los parámetros de calibración encontrados al
+    %la imagen, se utilizaron los parámetros de calibración encontrados al
     %inicio.
+    
     %Se realiza la conversión RGB to Grayscale de "im"
+    %La información de color no es importante para encontrar los círculos
+    %en este caso.
+    
+    %CAMBIAR imOrig a im cuando se tomen los nuevos ejemplos (1) y (2)
     Im1GRIS=rgb2gray(im);
     %Se realiza la conversión binaria de la imagen. Ahora solo habrá negro
     %o blanco, según el umbral definido
-    Im1BN=im2bw(Im1GRIS,0.6);%0.X corresponde al umbral para el aislamiento entre las zonas de interés y el fondo.
+    Im1BN=im2bw(Im1GRIS,0.35);%0.X corresponde al umbral para el aislamiento 
+    %entre las zonas de interés y el fondo.
+    %Entre menor sea esta cifra decimal menos sectores de la imagen serán
+    %considerados como negro, con lo cual, la imagen tendrá mayor cantidad
+    %de zonas en blanco, y viceversa.
     
+    %Por si se quiere visualizar cómo quedó en blanco y negro
+    %imshow(Im1BN)
+
     %De aquí en adelante se trabaja con im, que es la imagen con la distorsión
     %eliminada.
     [imagePoints, boardSize] = detectCheckerboardPoints(im);
     worldPoints = generateCheckerboardPoints(boardSize, tamanoCuadroMedicion);
+    %extrinsics devuelve una matriz de rotación y un vector de traslación
+    %que permite transformar los puntos del mundo al sistema coordenado de
+    %la cámara.
     [R, t] = extrinsics(imagePoints, worldPoints, params);
+    %pointsToWorld retorna los puntos del mundo en el plano XY de la
+    %imagen.
+    
+    %worldPoints es de 54x2, que son las 54 esquinas de los cuadros
+    %internos del patrón rectangular.
     worldPoints1 = pointsToWorld(params, R, t, undistortedPoints);
+    %Se resta a la segunda fila la primera, de los puntos en el mundo
     d = worldPoints1(2, :) - worldPoints1(1, :);
     mmCuadroPatron=hypot(d(1), d(2))
-    d=undistortedPoints(2,:)-undistortedPoints(1,:)
+    %Se resta a la segunda fila la primera, de los puntos de la cámara
+    d=undistortedPoints(2,:)-undistortedPoints(1,:);
+    %hypot es la raíz cuadrada de la suma de los cuadrados de los operandos
     pixelesCuadroPatron=hypot(d(1),d(2))
     %Se toma como referencia la medida de uno de los cuadros del patrón de
     %calibración de la imagen para extraer la conversión de unidades de la
@@ -75,17 +118,36 @@ for img= 1:CantidadEjemplosCaptura
     mmPorPixel=mmCuadroPatron/pixelesCuadroPatron
     %ya se tiene almacenado la conversion correspondiente en mm/pixel
     
+    %Se corrige la segunda imagen (que debe contener al patron rectangular)
     imOrig = Im2;
 
+    %Como no se han tomado nuevos ejemplos... se trabajaran sin
+    %distorsionar las imágenes ejemplo (1 y 2) disponibles hasta el
+    %momento.
+    
+    %No se ejecuta de momento desde AQUÍ:
     points = detectCheckerboardPoints(imOrig);
     [undistortedPoints,reprojectionErrors] = undistortPoints(points, params);
     %Al quitar la distorsión a la imagen aumenta su tamaño de 480x640 a
-    %625x785
+    %625x785 (en el caso de DroidCam)
     [im, newOrigin] = undistortImage(imOrig, params, 'OutputView', 'full');
     undistortedPoints = [undistortedPoints(:,1) - newOrigin(1), undistortedPoints(:,2) - newOrigin(2)];
+    %Hasta AQUÍ
+    
+    %Estas líneas se deben comentar al tomar los nuevos ejemplos:
+    im1=imread(strcat('ejemplo',num2str(img),'(1).jpg'));
+    Im1GRIS=rgb2gray(im1);
+    Im1BN=im2bw(Im1GRIS,0.35);
+    imshow(Im1BN) %Para visualizar en BN el resultado 1
+    im=Im2; %de momento, ya que esta debería ser sin distorsión, tal y como 
+    %se omitieron las líneas de arriba.
+    %Hasta aquí
+    
     Im2GRIS=rgb2gray(im);
-    Im2BN=im2bw(Im2GRIS,0.7);
+    Im2BN=im2bw(Im2GRIS,0.35);
+    imshow(Im2BN) %Para visualizar en BN el resultado 2
     ImSuperpuesta=Im1BN&Im2BN;
+    imshow(ImSuperpuesta) %Para visualizar en BN el resultado superpuesto
     %Se superponen las dos imágenes con  la segmentación del patrón
     %utilizado para determinar la orientación de los robots.
 
