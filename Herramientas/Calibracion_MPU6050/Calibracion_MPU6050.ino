@@ -23,8 +23,8 @@ void setup(){
 
 void loop(){  
   for(int j=0;j<=1;j++){
-    double gx_prom,gy_prom,gz_prom,acx_prom,acy_prom,acz_prom;
-    for (int i=0;i<=200;i++){
+    double gx_prom,gy_prom,gz_prom,acx_prom,acy_prom,acz_prom=0;
+    for (int i=0;i<=100;i++){
       float gxx,gyy,gzz,axx,ayy,azz;
       leeMPU(gxx, gyy, gzz, axx, ayy, azz);
       acx_prom=acx_prom+axx;
