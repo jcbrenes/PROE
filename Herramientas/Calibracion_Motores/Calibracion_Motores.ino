@@ -88,24 +88,20 @@ void loop() {
   int maxPWM=0; // Maximo PWM para el motor seleccionado como master en los 2 casos especiales
   digitalWrite(13,HIGH);
   ResetContadoresEncoders();
-  while(pwmMotorIzquierdo<=valorMaxPWM){
+
+  while(pwmMotorIzquierdo<=valorMaxPWM){  
     delayCalibracion=millis();
     ConfiguraEscribePuenteH(pwmMotorDerecho,pwmMotorIzquierdo);
     while (millis()<delayCalibracion+tiempoDelay){} //Espera 1 segundo mientras se estabilizan los motores
+    velRuedaIzq=calculaVelocidadRueda(contPulsosIzquierda,contPulsosIzqPasado); //obtiene velocidad en mm/s del motor izquierdo
+    velRuedaDer=calculaVelocidadRueda(contPulsosDerecha,contPulsosDerPasado); //obtiene velocidad en mm/s del motor derecho
+    sumVelMotorIzq=sumVelMotorIzq+ velRuedaIzq; 
+    sumVelMotorDer=sumVelMotorDer+ velRuedaIzq;
+    sumVelPwmIzq=sumVelPwmIzq + velRuedaIzq*pwmMotorIzquierdo;
+    sumVelPwmDer=sumVelPwmDer + velRuedaDer*pwmMotorDerecho;
+    pwmMotorIzquierdo=pwmMotorIzquierdo+5;
+    pwmMotorDerecho=pwmMotorDerecho+5;
 
-    if((micros()-tiempoActual)>=tiempoMuestreo){
-      tiempoActual=micros();  
-      velRuedaIzq=calculaVelocidadRueda(contPulsosIzquierda,contPulsosIzqPasado); //obtiene velocidad en mm/s del motor izquierdo
-      velRuedaDer=calculaVelocidadRueda(contPulsosDerecha,contPulsosDerPasado); //obtiene velocidad en mm/s del motor derecho
-      sumVelMotorIzq=sumVelMotorIzq+ velRuedaIzq; 
-      sumVelMotorDer=sumVelMotorDer+ velRuedaIzq;
-      sumVelPwmIzq=sumVelPwmIzq + velRuedaIzq*pwmMotorIzquierdo;
-      sumVelPwmDer=sumVelPwmDer + velRuedaDer*pwmMotorDerecho;
-      pwmMotorIzquierdo=pwmMotorIzquierdo+5;
-      pwmMotorDerecho=pwmMotorDerecho+5;
-      Serial.print("pwm:  "); Serial.print(pwmMotorIzquierdo); 
-      Serial.print("  velRuedaIzq:  "); Serial.print(velRuedaIzq); Serial.print("  velRuedaDer:  "); Serial.println(velRuedaDer);
-    }
   }
   ConfiguraEscribePuenteH(0,0);
   //Mediante el método de mínimos cuadrados calcula la pendiente y el coeficiente b para cada motor
