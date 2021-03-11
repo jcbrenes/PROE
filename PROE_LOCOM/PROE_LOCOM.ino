@@ -1115,6 +1115,7 @@ void RTC_Handler(void){
     
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }
+}
 
 //Inicializa la comunicación con el MPU
 void inicializarMPU(){
