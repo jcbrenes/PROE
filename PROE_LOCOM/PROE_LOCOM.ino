@@ -268,7 +268,8 @@ void setup() {
 
 void loop(){
 
-  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
+  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
   
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
 
