@@ -271,6 +271,7 @@ void loop(){
 <<<<<<< HEAD
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
   //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 =======
   sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 >>>>>>> 4236dee759cc05cd85d7ac50dd06396ddac17026
