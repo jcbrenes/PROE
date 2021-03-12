@@ -268,8 +268,12 @@ void setup() {
 
 void loop(){
 
+<<<<<<< HEAD
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
   //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+=======
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+>>>>>>> 4236dee759cc05cd85d7ac50dd06396ddac17026
   
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
 
@@ -1116,7 +1120,10 @@ void RTC_Handler(void){
     
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }
+<<<<<<< HEAD
 }
+=======
+>>>>>>> 4236dee759cc05cd85d7ac50dd06396ddac17026
 
 //Inicializa la comunicación con el MPU
 void inicializarMPU(){
