@@ -22,8 +22,13 @@ void setup(){
   }
 
 void loop(){  
-  for(int j=0;j<=1;j++){
-    double gx_prom,gy_prom,gz_prom,acx_prom,acy_prom,acz_prom=0;
+  for(int j=0;j<=2;j++){
+    float gx_prom=0;
+    float gy_prom=0;
+    float gz_prom=0;
+    float acx_prom=0;
+    float acy_prom=0;
+    float acz_prom=0;
     for (int i=0;i<=100;i++){
       float gxx,gyy,gzz,axx,ayy,azz;
       leeMPU(gxx, gyy, gzz, axx, ayy, azz);
@@ -33,9 +38,6 @@ void loop(){
       gx_prom=gx_prom+gxx;
       gy_prom=gy_prom+gyy;
       gz_prom=gz_prom+gzz;
-      Serial.print("gx: "); Serial.print(gxx); Serial.print(" gy: "); Serial.print(gyy); Serial.print(" gz: "); Serial.println(gzz);
-      Serial.print("acx: "); Serial.print(axx); Serial.print(" acy: "); Serial.print(ayy); Serial.print(" acz: "); Serial.println(azz);
-      delay(100);
     }
    gx_off=gx_off+(gx_prom/100);
    gy_off=gy_off+(gy_prom/100);
@@ -43,11 +45,15 @@ void loop(){
    acx_off=acx_off+(acx_prom/100);
    acy_off=acy_off+(acy_prom/100);
    acz_off=acz_off+(16384-(acz_prom/100));
-   Serial.println("Offsets actuales: ");
-   Serial.print("gx_off: "); Serial.print(gx_off); Serial.print(" gy_off: "); Serial.print(gy_off); Serial.print(" gz:off: "); Serial.println(gz_off);
-   Serial.print("acx_off: "); Serial.print(acx_off); Serial.print(" acy_off: "); Serial.print(acy_off); Serial.print(" acz_off: "); Serial.println(acz_off);
-   delay(3000);
   }
+  //Guarda los datos en la EEPROM
+  guardarDatoFloat(gx_off,16);
+  guardarDatoFloat(gy_off,20);
+  guardarDatoFloat(gz_off,24);
+  guardarDatoFloat(acx_off,28);
+  guardarDatoFloat(acy_off,32);
+  guardarDatoFloat(acz_off,36);
+  Serial.println("Datos guardados con exito");
   exit(0);
 }
 
@@ -78,11 +84,77 @@ void leeMPU(float &gx,float &gy,float &gz,float &ax,float &ay,float &az){
   gyro_y = myWire.read()<<8 | myWire.read();
   gyro_z = myWire.read()<<8 | myWire.read();
 
-  gx=gyro_x-gx_off;
-  gy=gyro_y-gy_off;
-  gz=gyro_z-gz_off;
+  gx=float(gyro_x)-gx_off;
+  gy=float(gyro_y)-gy_off;
+  gz=float(gyro_z)-gz_off;
 
-  ax=ac_x-acx_off;
-  ay=ac_y-acy_off;
-  az=ac_z+acz_off;
+  ax=float(ac_x)-acx_off;
+  ay=float(ac_y)-acy_off;
+  az=float(ac_z)+acz_off;
+}
+
+
+void guardarDatoFloat(float dato,int dirPagInicial){
+    byte varr1; //primeros 8 bits para guardar en la EEPROM (LSB)
+    byte varr2; //ultimo 8 bits para guardar en la EEPROM (MSB)
+    byte varrDec; //parte decimal para guardar en la EEPROM
+    byte signo; // signo del numero
+    float dato2;
+    if (dato<0.0){
+      signo=1;
+      dato2=(-1*dato);
+    }
+    else{
+      signo=0;
+      dato2=dato;
+      } 
+    transfVar(dato2,varr1,varr2,varrDec);
+    eepromEscribe(dirEEPROM,dirPagInicial,varr1);
+    delay(100);
+    eepromEscribe(dirEEPROM,dirPagInicial+1,varr2);
+    delay(100);
+    eepromEscribe(dirEEPROM,dirPagInicial+2,varrDec);
+    delay(100);
+    eepromEscribe(dirEEPROM,dirPagInicial+3,signo);
+    delay(100);
+ }
+
+float constrVar(byte LSB, byte MSB, byte dec){
+    int piv1,piv2;
+    float nuevo,decs;
+    piv1=LSB;
+    piv2=MSB<<8;
+    nuevo=piv1|piv2;
+    decs=float(dec);
+    nuevo=nuevo+decs/100;
+    return nuevo;
+  }
+void transfVar(float num,byte &var1,byte &var2,byte &varDec){
+    int nuevoNum=int(num);
+    int desplazamiento;
+    float dec;
+    desplazamiento=nuevoNum<<8;
+    var1=desplazamiento>>8; //LSB
+    var2=nuevoNum>>8; //MSB
+    dec=100*(num-nuevoNum);
+    varDec=int(dec);
+  }
+
+void eepromEscribe(byte dir, byte dirPag, byte data) {
+  myWire.beginTransmission(dir);
+  myWire.write(dirPag);
+  myWire.write(data);
+  myWire.endTransmission();
+}
+
+byte eepromLectura(int dir, int dirPag) {
+  myWire.beginTransmission(dir);
+  myWire.write(dirPag);
+  myWire.endTransmission();
+
+  myWire.requestFrom(dir, 1);
+  if(myWire.available())
+    return myWire.read();
+  else
+    return 0xFF;
 }

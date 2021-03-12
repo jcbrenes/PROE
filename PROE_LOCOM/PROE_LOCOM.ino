@@ -135,7 +135,8 @@ float factorEsc=1; //factor para convertir el elipsoide en una circunferencia
 
 //Variables para el MPU6050
 long tiempoPrev=0;
-float gir_ang_xPrev,gir_ang_yPrev,gir_ang_zPrev;
+float gir_ang_xPrev,gir_ang_yPrev,gir_ang_zPrev; //angulos previos para determinar el desplazamiento angular
+float gx_off,gy_off,gz_off,acx_off,acy_off,acz_off; // offsets para calibración del MPU6050
 
 void setup() {
   //asignación de pines
@@ -172,13 +173,22 @@ void setup() {
   yoff=leerDatoFloat(4);
   angulo=leerDatoFloat(8);
   factorEsc=leerDatoFloat(12);
+  //Carga los valores de calibración del MPU6050
+  gx_off=leerDatoFloat(16);
+  gy_off=leerDatoFloat(20);
+  gz_off=leerDatoFloat(24);
+  acx_off=leerDatoFloat(28);
+  acy_off=leerDatoFloat(32);
+  acz_off=leerDatoFloat(36);
   delay(2000);
 }
 
 void loop(){
-    if((micros()-tiempoActual)>=tiempoMuestreo){
+    //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
+     if((micros()-tiempoActual)>=tiempoMuestreo){
+
      tiempoActual=micros();
-    
+     
      //Máquina de estados que cambia el modo de operación
      switch (estado) {
   
@@ -214,15 +224,17 @@ void loop(){
           RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
           AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
           estado= GIRO;
+          float x= medirMagnet(); Serial.print("Orientacion antes: ");  Serial.println(x);
         }
         
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
           if(giroTerminado){
-            digitalWrite(13,LOW);
+            //digitalWrite(13,LOW);
             poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
             estado=AVANCE;
+            float x= medirMagnet(); Serial.print("Orientacion despues: "); Serial.println(x);
           }
         }
         
@@ -830,10 +842,9 @@ void inicializarMPU(){
   }
 
 //Funcione que extrae los datos crudos del MPU, los calibra y calcula desplazamiento angulares
-void leeMPU(){
+void leeMPU(float &gir_ang_x,float &gir_ang_y,float &gir_ang_z){
   int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos
   float gx,gy,gz,ax,ay,az; //guardan los valores reales de aceleración y velocidad angular
-  float gir_ang_x,gir_ang_y,gir_ang_z;
   long dt; //delta de tiempo para calcular desplazamiento angular
   if (tiempoPrev==0){
     tiempoPrev=millis();
@@ -857,12 +868,12 @@ void leeMPU(){
   tiempoPrev=millis();
   
   //Divide los datos entre sus ganancias
-  ax=(ac_x/A_R)*(9.81); //metros por segundo cuadrado
-  ay=(ac_y/A_R)*(9.81);
-  az=(ac_z/A_R)*(9.81);
-  gx=gyro_x/G_R; //grados por segundo
-  gy=gyro_y/G_R;
-  gz=gyro_z/G_R;
+  ax=((float(ac_x)-acx_off)/A_R)*(9.81); //metros por segundo cuadrado
+  ay=((float(ac_y)-acy_off)/A_R)*(9.81);
+  az=((float(ac_z)+acz_off)/A_R)*(9.81);
+  gx=(float(gyro_x)-gx_off)/G_R; //grados por segundo
+  gy=(float(gyro_y)-gy_off)/G_R;
+  gz=(float(gyro_z)-gz_off)/G_R;
 
   gir_ang_x = gx*(dt/1000.0) + gir_ang_xPrev;
   gir_ang_y = gy*(dt/1000.0) + gir_ang_yPrev;
@@ -872,11 +883,5 @@ void leeMPU(){
   gir_ang_yPrev=gir_ang_y;
   gir_ang_zPrev=gir_ang_z;
   
-  Serial.print("gyro x = ");
-  Serial.print(gir_ang_x);
-  Serial.print("y = ");
-  Serial.print(gir_ang_y);
-  Serial.print("z = ");
-  Serial.println(gir_ang_z);
   delay(100);
 }
