@@ -145,7 +145,7 @@ void revisarTemperatura(){ //Lectura del sensor de temperatura
   if(temperatura>maxTemp){ //Valor máximo de temperatura aceptable
     int i = int(temperatura);
     enviarDato(5,i,0);
-    Serial1.println("T");
+    //Serial1.println("T");
   }
 }
 
@@ -170,17 +170,17 @@ void revisarSensoresIR(){ //Revisa si la variable de sensores IR cambio de estad
     case 2:    // sensor IR frontal
       enviarDato(2,0,0);
       sensorIRdetectado=0;
-      Serial1.print("F ");
+      //Serial1.print("F ");
       break;
     case 3:    // sensor IR inferior derecho
       enviarDato(3,0,0);
       sensorIRdetectado=0;
-      Serial1.print("R ");
+      //Serial1.print("R ");
       break;
     case 4:    // sensor IR inferior izquierdo
       enviarDato(4,0,0);
       sensorIRdetectado=0;
-      Serial1.print("L ");
+      //Serial1.print("L ");
       break;
   }
 }
@@ -202,7 +202,7 @@ void enviarDato(int caso, int distancia, int angulo){ //Envia el paquete de dato
   //para visualización, enciende led y muestra el dato
   ledON=true;
   onTime=1000;
-  Serial1.println(dato);
+  //Serial1.println(dato);
   
 }
 

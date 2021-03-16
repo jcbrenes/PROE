@@ -423,7 +423,7 @@ void RecibirI2C (int cantidad)  {
       mensaje[i] = (*ptrMensaje & (255UL << (i-24)*8)) >> (i-24)*8;
     }
 
-    Serial.print(*(float*)&mensaje[0]); Serial.print("; "); Serial.print(*(float*)&mensaje[4]); Serial.print("; "); Serial.print(*(float*)&mensaje[8]); Serial.print("; "); Serial.print(*(float*)&mensaje[12]); Serial.print("; "); Serial.print(*(float*)&mensaje[16]); Serial.print("; "); Serial.print(*(float*)&mensaje[20]); Serial.print("; "); Serial.print(*(float*)&mensaje[24]); Serial.println(";"); 
+    //Serial.print(*(float*)&mensaje[0]); Serial.print("; "); Serial.print(*(float*)&mensaje[4]); Serial.print("; "); Serial.print(*(float*)&mensaje[8]); Serial.print("; "); Serial.print(*(float*)&mensaje[12]); Serial.print("; "); Serial.print(*(float*)&mensaje[16]); Serial.print("; "); Serial.print(*(float*)&mensaje[20]); Serial.print("; "); Serial.print(*(float*)&mensaje[24]); Serial.println(";"); 
 
     //Una vez creado el mensaje, no vuelvo a crear otro hasta que la interrupción baje la bandera.
     mensajeCreado = true;
@@ -437,13 +437,13 @@ void DeteccionObstaculo(){
 
   if(giroTerminado==1 && millis()>5000){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
    //digitalWrite(13,HIGH);
-   Serial.print("INT OBS!  ");
-   Serial.print(datosSensores[ultimoObstaculo][3]);
-   Serial.print("  d: ");
-   Serial.print(datosSensores[ultimoObstaculo][4]);
-   Serial.print("  ang: ");
-   Serial.println(datosSensores[ultimoObstaculo][5]);
-   delay(10);
+   //Serial.print("INT OBS!  ");
+   //Serial.print(datosSensores[ultimoObstaculo][3]);
+   //Serial.print("  d: ");
+   //Serial.print(datosSensores[ultimoObstaculo][4]);
+   //Serial.print("  ang: ");
+   //Serial.println(datosSensores[ultimoObstaculo][5]);
+   //delay(10);
    estado=ESCOGER_DIRECCION;
   }   
 }
@@ -455,13 +455,13 @@ void ActualizarUbicacion(){
   else if (poseActual[2]==90 || poseActual[2]==-270) { poseActual[0] = poseActual[0] + distanciaAvanzada;}
   else if (poseActual[2]==-90 || poseActual[2]==270) { poseActual[0] = poseActual[0] - distanciaAvanzada;}
   else if (abs(poseActual[2])==180) { poseActual[1] = poseActual[1] - distanciaAvanzada;}
-  Serial.print("Pose=>  X: ");
-  Serial.print(poseActual[0]);
-  Serial.print("  Y: ");
-  Serial.print(poseActual[1]);
-  Serial.print("  Theta: ");
-  Serial.println(poseActual[2]);
-  delay(10);
+  //Serial.print("Pose=>  X: ");
+  //Serial.print(poseActual[0]);
+  //Serial.print("  Y: ");
+  //Serial.print(poseActual[1]);
+  //Serial.print("  Theta: ");
+  //Serial.println(poseActual[2]);
+  //delay(10);
 }
 
 void RevisaObstaculoPeriferia(){
@@ -480,13 +480,13 @@ void RevisaObstaculoPeriferia(){
         if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {obstaculoIzquierda=true;} 
     }
   }
-  Serial.print("ObsPeri=>  I:");
-  Serial.print(obstaculoIzquierda);
-  Serial.print("  A:");
-  Serial.print(obstaculoAdelante);
-  Serial.print("  D:");
-  Serial.println(obstaculoDerecha);
-  delay(10);
+  //Serial.print("ObsPeri=>  I:");
+  //Serial.print(obstaculoIzquierda);
+  //Serial.print("  A:");
+  //Serial.print(obstaculoAdelante);
+  //Serial.print("  D:");
+  //Serial.println(obstaculoDerecha);
+  //delay(10);
 }
 
 void AsignarDireccionRWD(){
@@ -517,11 +517,11 @@ void AsignarDireccionRWD(){
       anguloGiro = random(minRandom,maxRandom)*incrementoPosible-90;
     }
 
-    Serial.print("DirGlobal: ");
-    Serial.print(direccionGlobal);
-    Serial.print("   Giro: ");
-    Serial.println(anguloGiro);
-    delay(10);
+    //Serial.print("DirGlobal: ");
+    //Serial.print(direccionGlobal);
+    //Serial.print("   Giro: ");
+    //Serial.println(anguloGiro);
+    //delay(10);
     
     //Reset de la simplificación sobre obstáculo en la pose actual
     obstaculoAdelante=false;
