@@ -207,7 +207,7 @@ void setup() {
   yoff=leerDatoFloat(4);
   angulo=leerDatoFloat(8);
   factorEsc=leerDatoFloat(12);
-  
+
   
   pinMode(RFM69_RST, OUTPUT);
   digitalWrite(RFM69_RST, LOW);
@@ -373,12 +373,19 @@ void RecibirI2C (int cantidad)  {
     
     //Genero números al azar acorde a lo que el robot eventualmente podría enviar
     float robotID = (float)idRobot;         //Esta variable se debe volver a definir, pues idRobot al ser global presenta problema al crear el mensaje.
-    float xP = (float)random(15,500)*frac;
-    float yP = (float)random(1,500)*frac;
+    float xP = (float)poseActual[0];        //Posición X en que se detecto el obstaculo
+    float yP = (float)poseActual[1];        //Posición Y en que se detecto el obstaculo
     float phi = 1.574;                      //Dato estático que se usó para ver la integridad del mensaje, el valor no significa nada.
     float tipo = (float)tipoSensor;         //Este no lleva *frac porque el tipo en teoría es un 0,1,2 ó 3.
     float rObs = (float)distancia;
-    float alphaObs = (float)angulo;         
+    float alphaObs = (float)(medirMagnet() + angulo); //Angulo respecto al "norte"
+    
+    if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
+      alphaObs = alphaObs - 360;          
+    }
+    else if(alphaObs < -180){
+      alphaObs = alphaObs + 360;
+    }
 
     //Construyo mensaje (es una construcción bastante manual que podría mejorar)
     ptrMensaje = (uint32_t*)&robotID;       //Utilizo el puntero para extraer la información del dato flotante.
@@ -1107,7 +1114,8 @@ void RTC_Handler(void){
     mensajeCreado = false;                      //Bajo la bandera para indicar que ya se envió el mensaje y se puede crear uno nuevo.
     
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
-  }
+ }
+}
 
 //Inicializa la comunicación con el MPU
 void inicializarMPU(){
@@ -1115,7 +1123,7 @@ void inicializarMPU(){
   myWire.write(0x6B);   //escribir en la direccion 0x6B
   myWire.write(0x00);   //escribe 0 en la direccion 0x6B (arranca el sensor)
   myWire.endTransmission();   //termina escritura
-  }
+}
 
 //Funcione que extrae los datos crudos del MPU
 void leeMPU(){

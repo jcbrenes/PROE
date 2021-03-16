@@ -55,7 +55,7 @@ unsigned long millisAnterior=0;
 int servoPos=0;
 int incremento=1; //cantidad de grados que aumenta el servo en cada movimiento
 bool ledON = false; 
-int onTime= 1000; //tiempo de encendido del LED en milisegundos
+int onTime= 300; //tiempo de encendido del LED en milisegundos
 unsigned long millisLED=0;
 
 int c=0; //Pulso de led para ver actividad del STM
@@ -109,7 +109,7 @@ void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
     millisAnterior = millis();
     servoPos += incremento;
     myServo.write(servoPos);
-    angulo= 90 - servoPos; //se considera 0 grados, justo al frente
+    angulo= movimientoMaximo/2 - servoPos; //se considera 0 grados justo al frente
     if ((servoPos >= movimientoMaximo) || (servoPos <= 0)){ // se terminó el semiciclo, se invierte la dirección
       incremento = -incremento;
     }

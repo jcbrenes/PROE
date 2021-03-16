@@ -80,7 +80,7 @@ void loop() {
   uint8_t len = sizeof(buf);
 
   if (rf69.recv(buf, &len, timeStamp1)) {
-    if ((*(float*)&buf[0])==0) return; //Si el ID es 0 no lo muestra, evita enviar un array vacio a consola
+    if ((*(float*)&buf[0])<1) return; //Si el ID es 0 no lo muestra, evita enviar un array vacio a consola
     buf[len] = 0;
     Serial.print(*(float*)&buf[0]); Serial.print("; "); Serial.print(*(float*)&buf[4]); Serial.print("; "); Serial.print(*(float*)&buf[8]); Serial.print("; "); Serial.print(*(float*)&buf[12]); Serial.print("; "); Serial.print(*(float*)&buf[16]); Serial.print("; "); Serial.print(*(float*)&buf[20]); Serial.print("; "); Serial.print(*(float*)&buf[24]); Serial.println(";");
   }
