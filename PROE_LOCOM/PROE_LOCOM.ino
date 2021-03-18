@@ -19,7 +19,7 @@ TwoWire myWire(&sercom1, 11, 13);
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
 const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
-const int factorEncoder=4; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
+const int factorEncoder=2; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
 const float circunferenciaRueda=139.5;//Circunferencia de la rueda = 139.5mm 
 const float pulsosPorMilimetro=((float)factorEncoder*pulsosPorRev)/circunferenciaRueda; 
 const float distanciaCentroARueda=87.5;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
@@ -184,16 +184,13 @@ void setup() {
 
   pinMode(ENC_DER_C1, INPUT); //Declarar pines C1 de encoder como entradas al no usarse como interrupción
   pinMode(ENC_IZQ_C1, INPUT);
-
-  pinMode(ENC_DER_C2, INPUT); 
-  pinMode(ENC_IZQ_C2, INPUT);
   
   delay(1000); //delay para evitar interrupciones al arrancar
   //asignación de interrupciones
   //attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
-  //attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
+  attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
   //attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
-  //attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
+  attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
   attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
    //temporización y varibales aleatorias
   tiempoActual=micros(); //para temporización de los ciclos
@@ -273,13 +270,9 @@ void loop(){
 
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
   //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
-
-  //Revisión del estado de los encoders
-  LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
-  LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
-
-  //Máquina de estados princcipal
+  
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
+
   if((micros()-tiempoActual)>=tiempoMuestreo){
 
      tiempoActual=micros();
