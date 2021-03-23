@@ -19,7 +19,7 @@ TwoWire myWire(&sercom1, 11, 13);
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
 const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
-const int factorEncoder=2; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
+const int factorEncoder=4; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
 const float circunferenciaRueda=139.5;//Circunferencia de la rueda = 139.5mm 
 const float pulsosPorMilimetro=((float)factorEncoder*pulsosPorRev)/circunferenciaRueda; 
 const float distanciaCentroARueda=87.5;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
@@ -29,8 +29,8 @@ const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
 //constantes para control PID de velocidad (están unidas con la constante de tiempo por simplificación de la ecuación)
 const float velRequerida=180.0; //unidades mm/s
-const float KpVel=3.0; //constante control proporcional
-const float KiVel=25.0 * tiempoMuestreoS; //constante control integral
+const float KpVel=2.0; //constante control proporcional
+const float KiVel=30.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
 //constantes para control PID de giro 
 const float KpGiro=1.8; //constante control proporcional
@@ -183,15 +183,17 @@ void setup() {
   pinMode(BIN2, OUTPUT);
   pinMode(INT_OBSTACULO, INPUT_PULLUP);
 
-  pinMode(ENC_DER_C1, INPUT); //Declarar pines C1 de encoder como entradas al no usarse como interrupción
+  pinMode(ENC_DER_C1, INPUT); //Declarar pines de encoder como entradas al no usarse como interrupción
+  pinMode(ENC_DER_C2, INPUT); 
   pinMode(ENC_IZQ_C1, INPUT);
+  pinMode(ENC_IZQ_C2, INPUT);
   
   delay(1000); //delay para evitar interrupciones al arrancar
   //asignación de interrupciones
   //attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
-  attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
+  //attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
   //attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
-  attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
+  //attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
   attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
    //temporización y varibales aleatorias
   tiempoActual=micros(); //para temporización de los ciclos
@@ -271,9 +273,12 @@ void loop(){
 
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
   //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+
+  //***No quitar
+  //Revisión de los encoders de los motores (tipo polling para no afectar la comunicación con Ints)
+  revisaEncoders(); 
   
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
-
   if((micros()-tiempoActual)>=tiempoMuestreo){
 
      tiempoActual=micros();
@@ -708,6 +713,13 @@ void ResetContadoresEncoders(){
   contPulsosDerPasado=0;
   contPulsosIzqPasado=0;
   
+}
+
+void revisaEncoders(){
+//Función que lee los estados de las entradas de los encoders y en caso de cambios actualiza el contador de pulsos
+//Se llama cuando se revisan los encoders en polling y no en interrupciones 
+  LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha); //Revisa los encoders rueda izquierda
+  LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda); //Revisa los encoders rueda derecha
 }
 
 void PulsosRuedaDerechaC1(){

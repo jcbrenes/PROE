@@ -4,7 +4,9 @@
 METODOLOGÍA: Están en orden de prioridad. Al solucionar uno cambiar el guión (-) por equis (x).
 
 
-- Mejorar los giros ante obstáculos. Ahora solo hace el giro y a veces se pega. Cambiarlo a que si gira por un obstáculo, retroceda unos cm y luego gire.
+x Mejorar los giros ante obstáculos. Ahora solo hace el giro y a veces se pega. Cambiarlo a que si gira por un obstáculo, retroceda unos cm y luego gire. (JCB)
+
+x El usar interrupciones para los encoders está trayendo problemas para la comunicación. Sería bueno revisarlos en polling nada más. (JCB)
 
 - A veces se queda el robot pegado, sigue enviando mensajes y gira el Sharp. Pero no sabemos por qué.
 
