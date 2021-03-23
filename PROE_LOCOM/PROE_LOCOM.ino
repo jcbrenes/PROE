@@ -28,9 +28,9 @@ const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (
 const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
 //constantes para control PID de velocidad (están unidas con la constante de tiempo por simplificación de la ecuación)
-const float velRequerida=150; //unidades mm/s
-const float KpVel=2; //constante control proporcional
-const float KiVel=20.0 * tiempoMuestreoS; //constante control integral
+const float velRequerida=180.0; //unidades mm/s
+const float KpVel=3.0; //constante control proporcional
+const float KiVel=25.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
 //constantes para control PID de giro 
 const float KpGiro=1.8; //constante control proporcional
@@ -41,7 +41,7 @@ const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 const int errorMinIntegral=-250;
 const int errorMaxIntegral=250;
 const int limiteSuperiorCicloTrabajoVelocidad=200;
-const int limiteInferiorCicloTrabajoVelocidad=0;
+const int limiteInferiorCicloTrabajoVelocidad=-200;
 const int limiteSuperiorCicloTrabajoGiro=200;
 const int limiteInferiorCicloTrabajoGiro=-200;
 const int cicloTrabajoMinimo= 20;
@@ -68,13 +68,14 @@ const int INT_OBSTACULO = A4;
 const int longitudArregloObstaculos = 1000;
 
 //Constantes algoritmo exploración
-int unidadAvance= 200; //medida en mm que avanza cada robot por movimiento
+int unidadAvance= 400; //medida en mm que avanza cada robot por movimiento
+int unidadRetroceso= -100; //medida en mm que retrocede el robot al encontrar un obstáculo
 
 //VARIABLES GLOBALES
 
 //Variables para la máquina de estados principal
-enum PosiblesEstados {AVANCE=0, GIRE_DERECHA, GIRE_IZQUIERDA,ESCOGER_DIRECCION,GIRO, NADA};
-char *PosEstados[] = {"AVANCE", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
+enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, NADA};
+char *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
 PosiblesEstados estado = AVANCE;
 
 //variable que almacena el tiempo del último ciclo de muestreo
@@ -283,6 +284,20 @@ void loop(){
         case AVANCE:  { 
           bool avanceTerminado= AvanzarDistancia(unidadAvance); 
           if (avanceTerminado){
+            ActualizarUbicacion(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
+            ConfiguracionParar(); 
+            estado = ESCOGER_DIRECCION;
+            //estado = RETROCEDA; 
+          }        
+          break; 
+        }
+
+        case RETROCEDA:  { 
+          bool avanceTerminado= AvanzarDistancia(unidadRetroceso); 
+          //Serial.println("Retrocediendo...");
+          if (avanceTerminado){
+            ActualizarUbicacion(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
+            ConfiguracionParar();
             estado = ESCOGER_DIRECCION; 
           }        
           break; 
@@ -307,12 +322,9 @@ void loop(){
         }
         
         case ESCOGER_DIRECCION: {
-          ActualizarUbicacion(); //Primero actualiza la ubicación actual en base al avance anterior y la orientación actual
-          ConfiguracionParar(); //detiene el carro un momento
           RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
           AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
           estado= GIRO;
-          float x= medirMagnet(); Serial.print("Orientacion antes: ");  Serial.println(x);
         }
         
         case GIRO: {
@@ -322,7 +334,6 @@ void loop(){
             poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
             estado=AVANCE;
-            float x= medirMagnet(); Serial.print("Orientacion despues: "); Serial.println(x);
           }
         }
         
@@ -434,9 +445,11 @@ void RecibirI2C (int cantidad)  {
 
 void DeteccionObstaculo(){
 //Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
-//Son obstáculos que requieren que el robot cambie de dirección
+//Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
 
-  if(giroTerminado==1 && millis()>5000){ //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
+  if(giroTerminado==1 && millis()>5000){ 
+    //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual, 
+    //y para que ignore las interrupciones los primeros 5s al encederlo
    //digitalWrite(13,HIGH);
    Serial.print("INT OBS!  ");
    Serial.print(datosSensores[ultimoObstaculo][3]);
@@ -445,7 +458,9 @@ void DeteccionObstaculo(){
    Serial.print("  ang: ");
    Serial.println(datosSensores[ultimoObstaculo][5]);
    delay(10);
-   estado=ESCOGER_DIRECCION;
+   ActualizarUbicacion(); //Como se interrumpió un movimiento, actualiza la ubicación actual
+   ConfiguracionParar(); //Se detiene un momento y reset de encoders 
+   estado=RETROCEDA;
   }   
 }
 
@@ -817,11 +832,16 @@ bool AvanzarDistancia(int distanciaDeseada){
 //Avanza hacia adelante una distancia definida en mm a velocidad constante
 //Devuelve true cuando alcanzó la distancia deseada
 
+  float velSetPoint= velRequerida;
+  if (distanciaDeseada<0){  //Si la distancia deseada es negativa, significa retroceder y por ende velocidad negativa (y un poco más despacio)
+    velSetPoint= -1 * velRequerida * 0.75;
+  }
+
   velActualDerecha= calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
-  int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(velRequerida, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
+  int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(velSetPoint, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
 
   velActualIzquierda= -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
-  int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(velRequerida, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
+  int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(velSetPoint, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
    
 //    Serial.print("Vel der: ");
 //    Serial.print(velActualDerecha,5);
@@ -838,7 +858,7 @@ bool AvanzarDistancia(int distanciaDeseada){
   float distanciaAvanzada= calculaDistanciaLinealRecorrida();
   
   bool avanceListo = false; 
-  if (distanciaAvanzada >= distanciaDeseada) {
+  if (abs(distanciaAvanzada) >= abs(distanciaDeseada)) {
     avanceListo = true; 
     //ResetContadoresEncoders();
   }
