@@ -129,6 +129,7 @@ float constrVar(byte LSB, byte MSB, byte dec){
     nuevo=nuevo+decs/100;
     return nuevo;
   }
+  
 void transfVar(float num,byte &var1,byte &var2,byte &varDec){
     int nuevoNum=int(num);
     int desplazamiento;

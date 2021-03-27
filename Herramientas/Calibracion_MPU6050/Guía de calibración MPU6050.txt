@@ -1,0 +1,13 @@
+Proyecto PROE
+
+Guía de calibración de MPU6050:
+
+1. Abrir el código de calibración MPU
+
+2. Colocar el robot en una superficie lo más horizontal posible, si es posible usen un nivel para verificar
+
+3. Abrir el monitor serial y correr el código
+
+4. Debería aparecer un mensaje en el monitor: "Datos guardados con exito"
+
+5. ¡Calibración lista! Los valores ya deberían estar almacenados en la EEPROM
