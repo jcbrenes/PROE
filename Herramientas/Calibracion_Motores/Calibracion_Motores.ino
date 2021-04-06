@@ -88,7 +88,6 @@ void loop() {
   int maxPWM=0; // Maximo PWM para el motor seleccionado como master en los 2 casos especiales
   digitalWrite(13,HIGH);
   ResetContadoresEncoders();
-
   while(pwmMotorIzquierdo<=valorMaxPWM){  
     delayCalibracion=millis();
     ConfiguraEscribePuenteH(pwmMotorDerecho,pwmMotorIzquierdo);
@@ -101,7 +100,6 @@ void loop() {
     sumVelPwmDer=sumVelPwmDer + velRuedaDer*pwmMotorDerecho;
     pwmMotorIzquierdo=pwmMotorIzquierdo+5;
     pwmMotorDerecho=pwmMotorDerecho+5;
-
   }
   ConfiguraEscribePuenteH(0,0);
   //Mediante el método de mínimos cuadrados calcula la pendiente y el coeficiente b para cada motor

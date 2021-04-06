@@ -1,4 +1,4 @@
-//Código de calibracion del magnetometro de los robots del proyecto PROE
+//Código de calibracion del magnetometro de los robots del proyecto PROE basado en el paper: https://ieeexplore.ieee.org/abstract/document/4209540
 //Usado en una placa Feather M0 RFM95 y magnetometro tipo _________
 //https://github.com/jcbrenes/PROE
 
