@@ -349,49 +349,29 @@ void loop(){
         case ESCOGER_DIRECCION: {
           RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
           AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
+          anguloInicial= medirMagnet(); //guardar el angulo antes de comenzar el giro
+          resetMPU(); //resetea las variables globlales del MPU para un giro nuevo
+          resetVarDif(); //resetea las variables globales utilizadas para medir el giro real
           estado= GIRO;
         }
-        
+  
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
+          dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
           if(giroTerminado){
+            dif=GiroReal(anguloInicial,medirMagnet()); 
             //digitalWrite(13,LOW);
             poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
+            Serial.print("Giro real: "); Serial.println(dif);
             estado=AVANCE;
           }
         }
-        break;
-      }
-
-      case ESCOGER_DIRECCION: {
-        ActualizarUbicacion(); //Primero actualiza la ubicación actual en base al avance anterior y la orientación actual
-        ConfiguracionParar(); //detiene el carro un momento
-        RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
-        AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
-        anguloInicial= medirMagnet(); //guardar el angulo antes de comenzar el giro
-        resetMPU(); //resetea las variables globlales del MPU para un giro nuevo
-        resetVarDif(); //resetea las variables globales utilizadas para medir el giro real
-        estado= GIRO;
-      }
-
-      case GIRO: {
-        giroTerminado=Giro((float)anguloGiro);
-        dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
-        if(giroTerminado){
-          dif=GiroReal(anguloInicial,medirMagnet()); 
-          //digitalWrite(13,LOW);
-          poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
-          ConfiguracionParar();
-          Serial.print("Giro real: "); Serial.println(dif);
-          estado=AVANCE;
+        case NADA: {
+          break;
         }
-      }
-      case NADA: {
-        break;
-      }
     }
-    }
+  }
 }
 
 
