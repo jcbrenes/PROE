@@ -17,35 +17,35 @@ TwoWire myWire(&sercom1, 11, 13);
 #define G_R 131.0
 
 //constantes del robot empleado
-const int tiempoMuestreo = 10000; //unidades: micro segundos
-const float pulsosPorRev = 206.0; //cantidad de pulsos de una única salida
-const int factorEncoder = 2; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
-const float circunferenciaRueda = 139.5; //Circunferencia de la rueda = 139.5mm
-const float pulsosPorMilimetro = ((float)factorEncoder*pulsosPorRev) / circunferenciaRueda;
-const float distanciaCentroARueda = 87.5; // Radio de giro del carro, es la distancia en mm entre el centro y una rueda.
-const float conversionMicroSaMin = 1 / (60 * 1000000); // factor de conversion microsegundo (unidades del tiempo muestreo) a minuto
-const float conversionMicroSaSDiv = 1000000; // factor de conversion microsegundo (unidades del tiempo muestreo) a segundo
-const float tiempoMuestreoS = (float)tiempoMuestreo / conversionMicroSaSDiv;
+const int tiempoMuestreo=10000; //unidades: micro segundos
+const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
+const int factorEncoder=4; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
+const float circunferenciaRueda=139.5;//Circunferencia de la rueda = 139.5mm 
+const float pulsosPorMilimetro=((float)factorEncoder*pulsosPorRev)/circunferenciaRueda; 
+const float distanciaCentroARueda=87.5;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
+const float conversionMicroSaMin=1/(60 * 1000000);// factor de conversion microsegundo (unidades del tiempo muestreo) a minuto
+const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (unidades del tiempo muestreo) a segundo
+const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
 //constantes para control PID de velocidad (están unidas con la constante de tiempo por simplificación de la ecuación)
-const float velRequerida = 150; //unidades mm/s
-const float KpVel = 2; //constante control proporcional
-const float KiVel = 20.0 * tiempoMuestreoS; //constante control integral
-const float KdVel = 0.01 / tiempoMuestreoS ; //constante control derivativo
-//constantes para control PID de giro
-const float KpGiro = 1.8; //constante control proporcional
-const float KiGiro = 20.0 * tiempoMuestreoS; //constante control integral
-const float KdGiro = 0.08 / tiempoMuestreoS; //constante control derivativo
+const float velRequerida=180.0; //unidades mm/s
+const float KpVel=2.0; //constante control proporcional
+const float KiVel=30.0 * tiempoMuestreoS; //constante control integral
+const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
+//constantes para control PID de giro 
+const float KpGiro=1.8; //constante control proporcional
+const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
+const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
 //Constantes para la implementación del control PID real
-const int errorMinIntegral = -250;
-const int errorMaxIntegral = 250;
-const int limiteSuperiorCicloTrabajoVelocidad = 200;
-const int limiteInferiorCicloTrabajoVelocidad = 0;
-const int limiteSuperiorCicloTrabajoGiro = 200;
-const int limiteInferiorCicloTrabajoGiro = -200;
-const int cicloTrabajoMinimo = 20;
-const int minCiclosEstacionario = 20;
+const int errorMinIntegral=-250;
+const int errorMaxIntegral=250;
+const int limiteSuperiorCicloTrabajoVelocidad=200;
+const int limiteInferiorCicloTrabajoVelocidad=-200;
+const int limiteSuperiorCicloTrabajoGiro=200;
+const int limiteInferiorCicloTrabajoGiro=-200;
+const int cicloTrabajoMinimo= 20;
+const int minCiclosEstacionario= 20;
 
 //Configuración de pines de salida para conexión con el Puente H
 const int PWMA = 12; //Control velocidad izquierdo
@@ -68,13 +68,15 @@ const int INT_OBSTACULO = A4;
 const int longitudArregloObstaculos = 1000;
 
 //Constantes algoritmo exploración
-int unidadAvance = 200; //medida en mm que avanza cada robot por movimiento
+int unidadAvance= 400; //medida en mm que avanza cada robot por movimiento
+int unidadRetroceso= -100; //medida en mm que retrocede el robot al encontrar un obstáculo
+
 
 //VARIABLES GLOBALES
 
 //Variables para la máquina de estados principal
-enum PosiblesEstados {AVANCE = 0, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, NADA};
-char *PosEstados[] = {"AVANCE", "GIRE_DERECHA", "GIRE_IZQUIERDA", "ESCOGER_DIRECCION", "GIRO", "NADA"};
+enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, NADA};
+char *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
 PosiblesEstados estado = AVANCE;
 
 //variable que almacena el tiempo del último ciclo de muestreo
@@ -194,18 +196,20 @@ void setup() {
   pinMode(BIN2, OUTPUT);
   pinMode(INT_OBSTACULO, INPUT_PULLUP);
 
-  pinMode(ENC_DER_C1, INPUT); //Declarar pines C1 de encoder como entradas al no usarse como interrupción
+  pinMode(ENC_DER_C1, INPUT); //Declarar pines de encoder como entradas al no usarse como interrupción
+  pinMode(ENC_DER_C2, INPUT); 
   pinMode(ENC_IZQ_C1, INPUT);
-
+  pinMode(ENC_IZQ_C2, INPUT);
+  
   delay(1000); //delay para evitar interrupciones al arrancar
   //asignación de interrupciones
   //attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
-  attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2, CHANGE);
+  //attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
   //attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
-  attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo, FALLING);
-  //temporización y varibales aleatorias
-  tiempoActual = micros(); //para temporización de los ciclos
+  //attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
+  attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
+   //temporización y varibales aleatorias
+  tiempoActual=micros(); //para temporización de los ciclos
   randomSeed(analogRead(A5)); //Para el algoritmo de exploración, el pinA5 está al aire
   direccionGlobal = (orientacionesRobot)(random(-1, 2) * 90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
   //Inicialización de puertos seriales
@@ -285,40 +289,77 @@ void setup() {
   delay(20);
 }
 
-void loop() {
+void loop(){
+
+  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
+  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+
+  //***No quitar
+  //Revisión de los encoders de los motores (tipo polling para no afectar la comunicación con Ints)
+  revisaEncoders(); 
   
-    //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-    //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
-    //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
-    if((micros()-tiempoActual)>=tiempoMuestreo){
+  //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
+  if((micros()-tiempoActual)>=tiempoMuestreo){
 
-    tiempoActual=micros();
-
-    //Máquina de estados que cambia el modo de operación
-    switch (estado) {
-
-      case AVANCE:  {
-        bool avanceTerminado= AvanzarDistancia(unidadAvance);
-        if (avanceTerminado){
-          estado = ESCOGER_DIRECCION;
+     tiempoActual=micros();
+     
+     //Máquina de estados que cambia el modo de operación
+     switch (estado) {
+  
+        case AVANCE:  { 
+          bool avanceTerminado= AvanzarDistancia(unidadAvance); 
+          if (avanceTerminado){
+            ActualizarUbicacion(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
+            ConfiguracionParar(); 
+            estado = ESCOGER_DIRECCION;
+            //estado = RETROCEDA; 
+          }        
+          break; 
         }
-        break;
-      }
 
-      case GIRE_DERECHA: {
-        giroTerminado= Giro(90);
-        if   (giroTerminado) {
-          ConfiguracionParar(); //detiene el carro un momento
-          estado = GIRE_IZQUIERDA;
+        case RETROCEDA:  { 
+          bool avanceTerminado= AvanzarDistancia(unidadRetroceso); 
+          //Serial.println("Retrocediendo...");
+          if (avanceTerminado){
+            ActualizarUbicacion(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
+            ConfiguracionParar();
+            estado = ESCOGER_DIRECCION; 
+          }        
+          break; 
         }
-        break;
-      }
-
-      case GIRE_IZQUIERDA:  {
-        giroTerminado= Giro(-90);
-        if   (giroTerminado) {
-          ConfiguracionParar(); //detiene el carro un momento
-          estado = GIRE_DERECHA;
+        
+        case GIRE_DERECHA: { 
+          giroTerminado= Giro(90);
+          if   (giroTerminado) {
+            ConfiguracionParar(); //detiene el carro un momento
+            estado = GIRE_IZQUIERDA;
+          }
+          break; 
+        }
+        
+        case GIRE_IZQUIERDA:  { 
+          giroTerminado= Giro(-90);
+          if   (giroTerminado) {
+            ConfiguracionParar(); //detiene el carro un momento
+            estado = GIRE_DERECHA;
+          }        
+          break; 
+        }
+        
+        case ESCOGER_DIRECCION: {
+          RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
+          AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
+          estado= GIRO;
+        }
+        
+        case GIRO: {
+          giroTerminado=Giro((float)anguloGiro);
+          if(giroTerminado){
+            //digitalWrite(13,LOW);
+            poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
+            ConfiguracionParar();
+            estado=AVANCE;
+          }
         }
         break;
       }
@@ -454,21 +495,25 @@ void RecibirI2C (int cantidad)  {
   }
 }
 
-void DeteccionObstaculo() {
-  //Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
-  //Son obstáculos que requieren que el robot cambie de dirección
+void DeteccionObstaculo(){
+//Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
+//Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
 
-  if (giroTerminado == 1 && millis() > 5000) { //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual
-    //digitalWrite(13,HIGH);
-    Serial.print("INT OBS!  ");
-    Serial.print(datosSensores[ultimoObstaculo][3]);
-    Serial.print("  d: ");
-    Serial.print(datosSensores[ultimoObstaculo][4]);
-    Serial.print("  ang: ");
-    Serial.println(datosSensores[ultimoObstaculo][5]);
-    delay(10);
-    estado = ESCOGER_DIRECCION;
-  }
+  if(giroTerminado==1 && millis()>5000){ 
+    //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual, 
+    //y para que ignore las interrupciones los primeros 5s al encederlo
+   //digitalWrite(13,HIGH);
+   Serial.print("INT OBS!  ");
+   Serial.print(datosSensores[ultimoObstaculo][3]);
+   Serial.print("  d: ");
+   Serial.print(datosSensores[ultimoObstaculo][4]);
+   Serial.print("  ang: ");
+   Serial.println(datosSensores[ultimoObstaculo][5]);
+   delay(10);
+   ActualizarUbicacion(); //Como se interrumpió un movimiento, actualiza la ubicación actual
+   ConfiguracionParar(); //Se detiene un momento y reset de encoders 
+   estado=RETROCEDA;
+  }   
 }
 
 void ActualizarUbicacion() {
@@ -735,8 +780,15 @@ void ResetContadoresEncoders() {
 
 }
 
-void PulsosRuedaDerechaC1() {
-  //Manejo de interrupción del canal C1 del encoder de la rueda derecha
+void revisaEncoders(){
+//Función que lee los estados de las entradas de los encoders y en caso de cambios actualiza el contador de pulsos
+//Se llama cuando se revisan los encoders en polling y no en interrupciones 
+  LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha); //Revisa los encoders rueda izquierda
+  LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda); //Revisa los encoders rueda derecha
+}
+
+void PulsosRuedaDerechaC1(){
+//Manejo de interrupción del canal C1 del encoder de la rueda derecha
   //LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
   LecturaEncoder2(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
 
@@ -857,29 +909,34 @@ bool AvanzarDistancia(int distanciaDeseada) {
   //Avanza hacia adelante una distancia definida en mm a velocidad constante
   //Devuelve true cuando alcanzó la distancia deseada
 
-  velActualDerecha = calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
-  int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(velRequerida, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
+  float velSetPoint= velRequerida;
+  if (distanciaDeseada<0){  //Si la distancia deseada es negativa, significa retroceder y por ende velocidad negativa (y un poco más despacio)
+    velSetPoint= -1 * velRequerida * 0.75;
+  }
 
-  velActualIzquierda = -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
-  int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(velRequerida, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
+  velActualDerecha= calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
+  int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(velSetPoint, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
 
-  //    Serial.print("Vel der: ");
-  //    Serial.print(velActualDerecha,5);
-  //    Serial.print(" ; Vel izq: ");
-  //    Serial.println(velActualIzquierda,5);
-  //
-  //    Serial.print("PWM der: ");
-  //    Serial.print(cicloTrabajoRuedaDerecha);
-  //    Serial.print(" ; PWM izq: ");
-  //    Serial.println(cicloTrabajoRuedaIzquierda);
-
+  velActualIzquierda= -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
+  int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(velSetPoint, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
+   
+//    Serial.print("Vel der: ");
+//    Serial.print(velActualDerecha,5);
+//    Serial.print(" ; Vel izq: ");
+//    Serial.println(velActualIzquierda,5);
+//
+//    Serial.print("PWM der: ");
+//    Serial.print(cicloTrabajoRuedaDerecha);
+//    Serial.print(" ; PWM izq: ");
+//    Serial.println(cicloTrabajoRuedaIzquierda);
+  
   ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
 
-  float distanciaAvanzada = calculaDistanciaLinealRecorrida();
-
-  bool avanceListo = false;
-  if (distanciaAvanzada >= distanciaDeseada) {
-    avanceListo = true;
+  float distanciaAvanzada= calculaDistanciaLinealRecorrida();
+  
+  bool avanceListo = false; 
+  if (abs(distanciaAvanzada) >= abs(distanciaDeseada)) {
+    avanceListo = true; 
     //ResetContadoresEncoders();
   }
 
@@ -1288,7 +1345,6 @@ void RTC_Handler(void) {
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }
 }
-
 
 //Inicializa la comunicación con el MPU
 void inicializarMPU() {
