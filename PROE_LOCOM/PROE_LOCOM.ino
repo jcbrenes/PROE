@@ -359,7 +359,7 @@ void loop(){
   
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
-          dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
+          //dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
           if(giroTerminado){
             dif=GiroReal(anguloInicial,medirMagnet()); 
             //digitalWrite(13,LOW);
