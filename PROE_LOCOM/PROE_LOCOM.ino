@@ -6,7 +6,7 @@
 #include "wiring_private.h" // pinPeripheral() function
 #include <SPI.h> //Biblioteca para la comunicacion por radio frecuencia
 #include <RH_RF69.h> //Biblioteca para la comunicacion por radio frecuencia
-
+ 
 TwoWire myWire(&sercom1, 11, 13);
 
 #define dirEEPROM B01010000 //Direccion de la memoria EEPROM
