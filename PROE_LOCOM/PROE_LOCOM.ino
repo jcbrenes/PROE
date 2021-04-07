@@ -458,38 +458,38 @@ void CrearMensaje(int tipoSensorX, int distanciaX, int anguloX){ //Crea el mensa
 
     //Construyo mensaje (es una construcción bastante manual que podría mejorar)
     ptrMensaje = (uint32_t*)&robotID;       //Utilizo el puntero para extraer la información del dato flotante.
-    for(uint8_t i = 0; i < 4; i++){
-      mensaje[i] = (*ptrMensaje & (255UL << i*8)) >> i*8;  //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
+    for (uint8_t i = 0; i < 4; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << i * 8)) >> i * 8; //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
     }
 
     ptrMensaje = (uint32_t*)&xP;
-    for(uint8_t i = 4; i < 8; i++){
-      mensaje[i] = (*ptrMensaje & (255UL << (i-4)*8)) >> (i-4)*8;
+    for (uint8_t i = 4; i < 8; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 4) * 8)) >> (i - 4) * 8;
     }
 
     ptrMensaje = (uint32_t*)&yP;
-    for(uint8_t i = 8; i < 12; i++){
-      mensaje[i] = (*ptrMensaje & (255UL << (i-8)*8)) >> (i-8)*8;
+    for (uint8_t i = 8; i < 12; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 8) * 8)) >> (i - 8) * 8;
     }
 
     ptrMensaje = (uint32_t*)&phi;
-    for(uint8_t i = 12; i < 16; i++){
-      mensaje[i] = (*ptrMensaje & (255UL << (i-12)*8)) >> (i-12)*8;
+    for (uint8_t i = 12; i < 16; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 12) * 8)) >> (i - 12) * 8;
     }
 
     ptrMensaje = (uint32_t*)&tipo;
-    for(uint8_t i = 16; i < 20; i++){
-      mensaje[i] = (*ptrMensaje & (255UL << (i-16)*8)) >> (i-16)*8;
+    for (uint8_t i = 16; i < 20; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 16) * 8)) >> (i - 16) * 8;
     }
 
     ptrMensaje = (uint32_t*)&rObs;
-    for(uint8_t i = 20; i < 24; i++){
-      mensaje[i] = (*ptrMensaje & (255UL << (i-20)*8)) >> (i-20)*8;
+    for (uint8_t i = 20; i < 24; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 20) * 8)) >> (i - 20) * 8;
     }
 
     ptrMensaje = (uint32_t*)&alphaObs;
-    for(uint8_t i = 24; i < 28; i++){
-      mensaje[i] = (*ptrMensaje & (255UL << (i-24)*8)) >> (i-24)*8;
+    for (uint8_t i = 24; i < 28; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 24) * 8)) >> (i - 24) * 8;
     }
 
     //Serial.print(*(float*)&mensaje[0]); Serial.print("; "); Serial.print(*(float*)&mensaje[4]); Serial.print("; "); Serial.print(*(float*)&mensaje[8]); Serial.print("; "); Serial.print(*(float*)&mensaje[12]); Serial.print("; "); Serial.print(*(float*)&mensaje[16]); Serial.print("; "); Serial.print(*(float*)&mensaje[20]); Serial.print("; "); Serial.print(*(float*)&mensaje[24]); Serial.println(";"); 
