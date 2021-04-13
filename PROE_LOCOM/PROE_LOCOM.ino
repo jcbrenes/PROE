@@ -6,7 +6,7 @@
 #include "wiring_private.h" // pinPeripheral() function
 #include <SPI.h> //Biblioteca para la comunicacion por radio frecuencia
 #include <RH_RF69.h> //Biblioteca para la comunicacion por radio frecuencia
- 
+
 TwoWire myWire(&sercom1, 11, 13);
 
 #define dirEEPROM B01010000 //Direccion de la memoria EEPROM
@@ -72,6 +72,7 @@ int unidadAvance= 400; //medida en mm que avanza cada robot por movimiento
 int unidadRetroceso= -100; //medida en mm que retrocede el robot al encontrar un obstáculo
 int limiteRetroceso= 5000; //Máximo tiempo (ms) permitido para completar el retroceso, si no termina en ese tiempo asume que tiene un obstaculo atras
 unsigned long tiempoRetroceso=0; //Almacena el momento en que se cambia a estado de retroceso para usar el limite de tiempo
+
 
 //VARIABLES GLOBALES
 
@@ -445,8 +446,9 @@ void RecibirI2C (int cantidad)  {
 void CrearMensaje(int tipoSensorX, int distanciaX, int anguloX){ //Crea el mensaje que la interrupción del TDMA envia
   
   if(timeReceived && !mensajeCreado){       //Aquí solo debe enviar mensajes, pero eso lo hace la interrupción, así que aquí se construyen mensajes y se espera a que la interrupción los envíe.
+
     float frac = 0.867;                     //Fracción que se usa para insertarle a los random decimales. Se escogió al azar, el número no significa nada.
-    
+
     //Genero números al azar acorde a lo que el robot eventualmente podría enviar
     float robotID = (float)idRobot;         //Esta variable se debe volver a definir, pues idRobot al ser global presenta problema al crear el mensaje.
     float xP = (float)poseActual[0];        //Posición X en que se detecto el obstaculo
@@ -517,6 +519,7 @@ void DeteccionObstaculo(){
    delay(10);
    ActualizarUbicacion(); //Como se interrumpió un movimiento, actualiza la ubicación actual
    ConfiguracionParar(); //Se detiene un momento y reset de encoders 
+
    if(estado!=RETROCEDA){ //Si no se encontraba en retroceso por una detección anterior almacenar el tiempoRetroceso
     tiempoRetroceso=millis(); //Almacena el tiempo cuando se cambio a retroceso para comparar con el limite
    }
@@ -785,7 +788,6 @@ void ResetContadoresEncoders() {
 
   contPulsosDerPasado = 0;
   contPulsosIzqPasado = 0;
-
 }
 
 void revisaEncoders(){

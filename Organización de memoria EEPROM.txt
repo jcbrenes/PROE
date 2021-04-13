@@ -6,3 +6,9 @@ Dirección: 0-3 ; Dato: offset en x para magnetómetro
 Dirección: 4-7 ; Dato: offset en y para magnetómetro
 Dirección: 8-11 ; Dato: angulo para rotación de datos en magnetómetro
 Dirección: 12-15 ; Dato: factor de escalado para magnetómetro
+Dirección: 16-20 ; Dato: offset en x para giroscopio del MPU6050
+Dirección: 20-24 ; Dato: offset en y para giroscopio del MPU6050
+Dirección: 24-28 ; Dato: offset en z para giroscopio del MPU6050
+Dirección: 28-32 ; Dato: offset en x para acelerómetro del MPU6050
+Dirección: 32-36 ; Dato: offset en y para acelerómetro del MPU6050
+Dirección: 36-40 ; Dato: offset en z para acelerómetro del MPU6050
