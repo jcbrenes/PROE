@@ -80,11 +80,31 @@ void loop() {
   uint8_t len = sizeof(buf);
 
   if (rf69.recv(buf, &len, timeStamp1)) {
-    if ((*(float*)&buf[0])==0) return; //Si el ID es 0 no lo muestra, evita enviar un array vacio a consola
+    if ((*(float*)&buf[0])<1) return; //Si el ID es 0 no lo muestra, evita enviar un array vacio a consola
     buf[len] = 0;
     Serial.print(*(float*)&buf[0]); Serial.print("; "); Serial.print(*(float*)&buf[4]); Serial.print("; "); Serial.print(*(float*)&buf[8]); Serial.print("; "); Serial.print(*(float*)&buf[12]); Serial.print("; "); Serial.print(*(float*)&buf[16]); Serial.print("; "); Serial.print(*(float*)&buf[20]); Serial.print("; "); Serial.print(*(float*)&buf[24]); Serial.println(";");
   }
+
+  if(Serial.available()){ //Si se recibe algo por el serial vuelve a mandar la señal de sincronización, evita tener que reiniciar el feather
+    while(Serial.available()){ //Limpiar el buffer del serial
+      Serial.read();
+    }
+    sincronizar();
+  }
+  
   actividad();
+}
+
+void sincronizar(){
+  unsigned long timeStamp1 = RTC->MODE0.COUNT.reg; //Extraer tiempo del RTC de la base
+  uint8_t reloj[3];
+  uint32_t* ptrReloj;  
+  ptrReloj = (uint32_t*)&timeStamp1;       //Utilizo el puntero para extraer la información del dato flotante.
+  
+  for(uint8_t i = 0; i < 4; i++){
+    reloj[i] = *ptrReloj >> i*8;  //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
+  }
+  rf69_manager.sendtoWait(reloj, sizeof(reloj), 4);     //Enviar valor del RTC al esclavo
 }
 
 void actividad(){  //Pulsar led 13 para mostrar actividad del feather

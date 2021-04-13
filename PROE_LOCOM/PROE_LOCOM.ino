@@ -70,6 +70,8 @@ const int longitudArregloObstaculos = 1000;
 //Constantes algoritmo exploración
 int unidadAvance= 400; //medida en mm que avanza cada robot por movimiento
 int unidadRetroceso= -100; //medida en mm que retrocede el robot al encontrar un obstáculo
+int limiteRetroceso= 5000; //Máximo tiempo (ms) permitido para completar el retroceso, si no termina en ese tiempo asume que tiene un obstaculo atras
+unsigned long tiempoRetroceso=0; //Almacena el momento en que se cambia a estado de retroceso para usar el limite de tiempo
 
 
 //VARIABLES GLOBALES
@@ -136,7 +138,7 @@ float xoff = 0; //offset de calibración en x
 float yoff = 0; //offset de calibración en y
 float angulo = 0; //angulo del elipsoide que forman los datos
 float factorEsc = 1; //factor para convertir el elipsoide en una circunferencia
-
+float magInicial=0; //valor de orientación inicial
 
 //Variables para el MPU6050
 long tiempoPrev = 0;
@@ -286,6 +288,7 @@ void setup() {
   RTCresetRemove();                     //Quito el reset del RTC.
 
   Serial.println("¡RFM69 radio en funcionamiento!");
+  origenMagnet();
   delay(20);
 }
 
@@ -357,7 +360,7 @@ void loop(){
   
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
-          dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
+          //dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
           if(giroTerminado){
             dif=GiroReal(anguloInicial,medirMagnet()); 
             //digitalWrite(13,LOW);
@@ -419,17 +422,41 @@ void RecibirI2C (int cantidad)  {
   datosSensores[ultimoObstaculo][4] = distancia;
   datosSensores[ultimoObstaculo][5] = angulo;
 
-  if (timeReceived && !mensajeCreado) {     //Aquí solo debe enviar mensajes, pero eso lo hace la interrupción, así que aquí se construyen mensajes y se espera a que la interrupción los envíe.
+  float alphaObs = (float)(medirMagnet() + angulo);
+  if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
+    alphaObs = alphaObs - 360;          
+  }
+  else if(alphaObs < -180){
+    alphaObs = alphaObs + 360;
+  }
+
+  alphaObs = alphaObs - magInicial;
+  if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
+    alphaObs = alphaObs - 360;          
+  }
+  else if(alphaObs < -180){
+    alphaObs = alphaObs + 360;
+  }
+
+  //obstaculoEnviado = false;
+  CrearMensaje(tipoSensor, distancia, alphaObs);
+  
+}
+
+void CrearMensaje(int tipoSensorX, int distanciaX, int anguloX){ //Crea el mensaje que la interrupción del TDMA envia
+  
+  if(timeReceived && !mensajeCreado){       //Aquí solo debe enviar mensajes, pero eso lo hace la interrupción, así que aquí se construyen mensajes y se espera a que la interrupción los envíe.
+
     float frac = 0.867;                     //Fracción que se usa para insertarle a los random decimales. Se escogió al azar, el número no significa nada.
 
     //Genero números al azar acorde a lo que el robot eventualmente podría enviar
     float robotID = (float)idRobot;         //Esta variable se debe volver a definir, pues idRobot al ser global presenta problema al crear el mensaje.
-    float xP = (float)random(15, 500) * frac;
-    float yP = (float)random(1, 500) * frac;
-    float phi = 1.574;                      //Dato estático que se usó para ver la integridad del mensaje, el valor no significa nada.
-    float tipo = (float)tipoSensor;         //Este no lleva *frac porque el tipo en teoría es un 0,1,2 ó 3.
-    float rObs = (float)distancia;
-    float alphaObs = (float)angulo;
+    float xP = (float)poseActual[0];        //Posición X en que se detecto el obstaculo
+    float yP = (float)poseActual[1];        //Posición Y en que se detecto el obstaculo
+    float phi = (float)poseActual[2];       //"Orientación" del robot
+    float tipo = (float)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
+    float rObs = (float)distanciaX;         //Distancia medida por el sharp si aplica
+    float alphaObs = (float)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
 
     //Construyo mensaje (es una construcción bastante manual que podría mejorar)
     ptrMensaje = (uint32_t*)&robotID;       //Utilizo el puntero para extraer la información del dato flotante.
@@ -467,7 +494,7 @@ void RecibirI2C (int cantidad)  {
       mensaje[i] = (*ptrMensaje & (255UL << (i - 24) * 8)) >> (i - 24) * 8;
     }
 
-    Serial.print(*(float*)&mensaje[0]); Serial.print("; "); Serial.print(*(float*)&mensaje[4]); Serial.print("; "); Serial.print(*(float*)&mensaje[8]); Serial.print("; "); Serial.print(*(float*)&mensaje[12]); Serial.print("; "); Serial.print(*(float*)&mensaje[16]); Serial.print("; "); Serial.print(*(float*)&mensaje[20]); Serial.print("; "); Serial.print(*(float*)&mensaje[24]); Serial.println(";");
+    //Serial.print(*(float*)&mensaje[0]); Serial.print("; "); Serial.print(*(float*)&mensaje[4]); Serial.print("; "); Serial.print(*(float*)&mensaje[8]); Serial.print("; "); Serial.print(*(float*)&mensaje[12]); Serial.print("; "); Serial.print(*(float*)&mensaje[16]); Serial.print("; "); Serial.print(*(float*)&mensaje[20]); Serial.print("; "); Serial.print(*(float*)&mensaje[24]); Serial.println(";"); 
 
     //Una vez creado el mensaje, no vuelvo a crear otro hasta que la interrupción baje la bandera.
     mensajeCreado = true;
@@ -492,6 +519,10 @@ void DeteccionObstaculo(){
    delay(10);
    ActualizarUbicacion(); //Como se interrumpió un movimiento, actualiza la ubicación actual
    ConfiguracionParar(); //Se detiene un momento y reset de encoders 
+
+   if(estado!=RETROCEDA){ //Si no se encontraba en retroceso por una detección anterior almacenar el tiempoRetroceso
+    tiempoRetroceso=millis(); //Almacena el tiempo cuando se cambio a retroceso para comparar con el limite
+   }
    estado=RETROCEDA;
   }   
 }
@@ -757,7 +788,6 @@ void ResetContadoresEncoders() {
 
   contPulsosDerPasado = 0;
   contPulsosIzqPasado = 0;
-
 }
 
 void revisaEncoders(){
@@ -1075,6 +1105,14 @@ int buscaCuadrante(float angulo) {
     cuadrante = 2;
   }
   return cuadrante;
+}
+
+void origenMagnet(){ //Mide la orientación y guarda un promedio
+  float x=0;
+  for(int i=0; i<25; i++){
+    x = x + medirMagnet();
+  }
+  magInicial = x/25;
 }
 
 void inicializaMagnet() {
