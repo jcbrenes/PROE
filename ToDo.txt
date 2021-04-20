@@ -8,7 +8,7 @@ x Mejorar los giros ante obstáculos. Ahora solo hace el giro y a veces se pega.
 
 x El usar interrupciones para los encoders está trayendo problemas para la comunicación. Sería bueno revisarlos en polling nada más. (JCB)
 
-- A veces se queda el robot pegado, sigue enviando mensajes y gira el Sharp. Pero no sabemos por qué. (Bryan)
+X- A veces se queda el robot pegado, sigue enviando mensajes y gira el Sharp. Pero no sabemos por qué. (Bryan)
 
 - A veces el robot colapsa (no se mueve ni el sharp), pero si manda mensajes (al parecer). Revisar qué pasa. (Bryan)
 
@@ -18,6 +18,8 @@ x El usar interrupciones para los encoders está trayendo problemas para la comu
 
 - Revisar la integridad de los datos de ubicación (salió raro en eje X).
 
+- Los giros no tienen deteccion de fallo (choque), ponerle aunque sea un temporizador para que no se quede pegado. Que pasa si falla?
+
 - Los giros aún duran mucho, porque se queda un toque corrigiendo. Hay que encontrar el juego correcto entre la manera de encontrar el estado estacionario y las constantes PID.
 
-- Mejorar la cantidad de datos que se envían en la comunicación. Pensar cómo enviar más datos en el mismo período de tiempo. Por ejemplo, no enviar datos repetidos.
+- Mejorar la cantidad de datos que se envían en la comunicación. Pensar cómo enviar más datos en el mismo período de tiempo. Por ejemplo, no enviar datos repetidos. (Andrés)
