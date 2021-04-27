@@ -18,7 +18,7 @@ x A veces se queda el robot pegado, sigue enviando mensajes y gira el Sharp. Per
 
 - Revisar la integridad de los datos de ubicación (salió raro en eje X).
 
-- Los giros no tienen deteccion de fallo (choque), ponerle aunque sea un temporizador para que no se quede pegado. Que pasa si falla?
+- Los giros no tienen deteccion de fallo (choque), ponerle aunque sea un temporizador para que no se quede pegado. (Bryan)
 
 - Los giros aún duran mucho, porque se queda un toque corrigiendo. Hay que encontrar el juego correcto entre la manera de encontrar el estado estacionario y las constantes PID.
 
