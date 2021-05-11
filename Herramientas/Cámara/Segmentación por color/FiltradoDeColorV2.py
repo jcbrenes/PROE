@@ -28,7 +28,6 @@
 #se asume discreto.
 
 #Bibliotecas requeridas
-
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
@@ -46,12 +45,13 @@ flags = [i for i in dir(cv2) if i.startswith('COLOR_')]
 #flags[num]
 
 #Cargar la imagen y mostrarla
-#imagen con montaje
-prueba = cv2.imread('PruebaIdentificadoresColor.jpg')
-#fotografía de cómo se ven los identificadores ya impresos en las condiciones del aula
-prueba2= cv2.imread('CyanRojoAzulAmarilloC.jpg')
-#fotografía de todo el espacio de visión con identificadores
-prueba3= cv2.imread('CyanRojoAzulAmarillo.jpg')
+#imagen con colores impresos
+prueba = cv2.imread('RoAzVe.jpg')
+#fotografía de cómo se ven los identificadores ya cortados en las condiciones del aula
+prueba2= cv2.imread('AmNaCyMaVe1.jpg')
+#fotografía de cómo se ven los identificadores ya cortados en las condiciones del aula,
+#con los robots movidos
+prueba3= cv2.imread('AmNaCyMaVe2.jpg')
 #plt.imshow(prueba)
 #plt.show()
 #Por defecto, OpenCV lee las imágenes en formato BGR, por eso los canales R y B salen
@@ -106,9 +106,9 @@ dark_colors = (180, 255, 255)
 light_cyan = (95, 175, 185)
 dark_cyan = (105, 255, 250)
 #Ver cyan
+"""
 lc_square = np.full((10, 10, 3), light_cyan, dtype=np.uint8) / 255.0
 dc_square = np.full((10, 10, 3), dark_cyan, dtype=np.uint8) / 255.0
-"""
 plt.subplot(1, 2, 1)
 plt.imshow(hsv_to_rgb(dc_square))
 plt.subplot(1, 2, 2)
@@ -116,14 +116,19 @@ plt.imshow(hsv_to_rgb(lc_square))
 plt.show()
 #"""
 
+"""
 #Rangos magenta: probados buenos
 light_magenta = (140, 100, 0)
 dark_magenta = (165, 255, 255)
+"""
+#Rangos magenta: probados buenos
+light_magenta = (160, 100, 0)
+dark_magenta = (170, 255, 255)
 
 #Ver magenta: falta mejorar el rango
+"""
 lm_square = np.full((10, 10, 3), light_magenta, dtype=np.uint8) / 255.0
 dm_square = np.full((10, 10, 3), dark_magenta, dtype=np.uint8) / 255.0
-"""
 plt.subplot(1, 2, 1)
 plt.imshow(hsv_to_rgb(dm_square))
 plt.subplot(1, 2, 2)
@@ -135,9 +140,9 @@ plt.show()
 light_verde = (45, 0, 0)
 dark_verde = (80, 100, 255)
 #Ver verde
+"""
 lv_square = np.full((10, 10, 3), light_verde, dtype=np.uint8) / 255.0
 dv_square = np.full((10, 10, 3), dark_verde, dtype=np.uint8) / 255.0
-"""
 plt.subplot(1, 2, 1)
 plt.imshow(hsv_to_rgb(dv_square))
 plt.subplot(1, 2, 2)
@@ -149,9 +154,23 @@ plt.show()
 light_ama = (15, 0, 0)
 dark_ama = (35, 255, 255)
 #Ver amarillo
+"""
 lv_square = np.full((10, 10, 3), light_ama, dtype=np.uint8) / 255.0
 dv_square = np.full((10, 10, 3), dark_ama, dtype=np.uint8) / 255.0
+plt.subplot(1, 2, 1)
+plt.imshow(hsv_to_rgb(dv_square))
+plt.subplot(1, 2, 2)
+plt.imshow(hsv_to_rgb(lv_square))
+plt.show()
 """
+
+#Rangos naranja: 
+light_nar = (12, 100, 200)
+dark_nar = (16, 255, 255)
+#Ver naranja
+"""
+lv_square = np.full((10, 10, 3), light_nar, dtype=np.uint8) / 255.0
+dv_square = np.full((10, 10, 3), dark_nar, dtype=np.uint8) / 255.0
 plt.subplot(1, 2, 1)
 plt.imshow(hsv_to_rgb(dv_square))
 plt.subplot(1, 2, 2)
@@ -160,12 +179,12 @@ plt.show()
 """
 
 #Rangos azul: 
-light_azul = (108, 125, 0)
-dark_azul = (113, 255, 255)
+light_azul = (100, 125, 10)
+dark_azul = (120, 255, 255)
 #Ver azul
+"""
 lv_square = np.full((10, 10, 3), light_azul, dtype=np.uint8) / 255.0
 dv_square = np.full((10, 10, 3), dark_azul, dtype=np.uint8) / 255.0
-"""
 plt.subplot(1, 2, 1)
 plt.imshow(hsv_to_rgb(dv_square))
 plt.subplot(1, 2, 2)
@@ -173,13 +192,13 @@ plt.imshow(hsv_to_rgb(lv_square))
 plt.show()
 """
 
-#Rangos rojo: 
-light_rojo = (165, 50, 0)
+#Rangos rojo:
+light_rojo = (168, 50, 0)
 dark_rojo = (180, 255, 255)
 #Ver rojo
+"""
 lv_square = np.full((10, 10, 3), light_rojo, dtype=np.uint8) / 255.0
 dv_square = np.full((10, 10, 3), dark_rojo, dtype=np.uint8) / 255.0
-"""
 plt.subplot(1, 2, 1)
 plt.imshow(hsv_to_rgb(dv_square))
 plt.subplot(1, 2, 2)
@@ -209,13 +228,13 @@ maskmagenta = cv2.inRange(hsv_prueba2, light_magenta, dark_magenta)
 maskmagenta3 = cv2.inRange(hsv_prueba3, light_magenta, dark_magenta)
 #Aplica la máscara
 resultmagenta = cv2.bitwise_and(prueba2, prueba2, mask=maskmagenta)
-"""
+
 plt.subplot(1, 2, 1)
 plt.imshow(maskmagenta, cmap="gray")
 plt.subplot(1, 2, 2)
 plt.imshow(resultmagenta)
 plt.show()
-"""
+
 
 #Máscara Verde
 #Pone 1 en el píxel que está dentro del rango, sino pone 0
@@ -245,12 +264,26 @@ plt.imshow(resultama)
 plt.show()
 """
 
+#Máscara Naranja
+#Pone 1 en el píxel que está dentro del rango, sino pone 0
+masknar = cv2.inRange(hsv_prueba2, light_nar, dark_nar)
+masknar3 = cv2.inRange(hsv_prueba3, light_nar, dark_nar)
+#Aplica la máscara
+resultnar = cv2.bitwise_and(prueba2, prueba2, mask=masknar)
+"""
+plt.subplot(1, 2, 1)
+plt.imshow(masknar, cmap="gray")
+plt.subplot(1, 2, 2)
+plt.imshow(resultnar)
+plt.show()
+"""
+
 #Máscara Azul
 #Pone 1 en el píxel que está dentro del rango, sino pone 0
-maskazul = cv2.inRange(hsv_prueba2, light_azul, dark_azul)
+maskazul = cv2.inRange(hsv_prueba1, light_azul, dark_azul)
 maskazul3 = cv2.inRange(hsv_prueba3, light_azul, dark_azul)
 #Aplica la máscara
-resultazul = cv2.bitwise_and(prueba2, prueba2, mask=maskazul)
+resultazul = cv2.bitwise_and(prueba1, prueba1, mask=maskazul)
 """
 plt.subplot(1, 2, 1)
 plt.imshow(maskazul, cmap="gray")
@@ -261,10 +294,10 @@ plt.show()
 
 #Máscara Rojo
 #Pone 1 en el píxel que está dentro del rango, sino pone 0
-maskrojo = cv2.inRange(hsv_prueba2, light_rojo, dark_rojo)
+maskrojo = cv2.inRange(hsv_prueba1, light_rojo, dark_rojo)
 maskrojo3 = cv2.inRange(hsv_prueba3, light_rojo, dark_rojo)
 #Aplica la máscara
-resultrojo = cv2.bitwise_and(prueba2, prueba2, mask=maskrojo)
+resultrojo = cv2.bitwise_and(prueba1, prueba1, mask=maskrojo)
 """
 plt.subplot(1, 2, 1)
 plt.imshow(maskrojo, cmap="gray")
@@ -274,11 +307,13 @@ plt.show()
 """
 
 #Máscara de todos los colores de identificadores:
-maskAll=maskrojo3+maskazul3+maskama3+maskcyan3+maskverde3+maskmagenta3
+maskAll=maskrojo3+maskazul3+maskama3+maskcyan3+maskverde3+maskmagenta3+masknar3
 #Aplica la máscara
 resultAll = cv2.bitwise_and(prueba3, prueba3, mask=maskAll)
+"""
 plt.subplot(1, 2, 1)
 plt.imshow(maskAll, cmap="gray")
 plt.subplot(1, 2, 2)
 plt.imshow(resultAll)
 plt.show()
+"""
