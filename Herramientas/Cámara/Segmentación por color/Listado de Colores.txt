@@ -1,0 +1,24 @@
+Colores Seleccionados:
+IMPRESOS
+Azul impreso
+Verde (sale oscuro) impreso
+Rojo impreso
+
+HOJAS
+Magenta hojas
+Cyan hojas
+Amarillo hojas
+Naranja hojas
+COMBINACIONES:
+amarillo-naranja
+naranja-amarillo
+amarillo-cyan
+cyan-amarillo
+amarillo-magenta
+magenta-amarillo
+naranja-magenta
+magenta-naranja
+naranja-cyan
+cyan-naranja
+cyan-magenta
+magenta-cyan
