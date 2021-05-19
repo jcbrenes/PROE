@@ -19,8 +19,9 @@ TwoWire myWire(&sercom1, 11, 13);
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
 const float pulsosPorRev=206.0; //cantidad de pulsos de una única salida
-const int factorEncoder=4; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
+const int factorEncoder=2; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
 const float circunferenciaRueda=139.5;//Circunferencia de la rueda = 139.5mm 
+//const float circunferenciaRueda=175.5;//Circunferencia de la rueda = 139.5mm 
 const float pulsosPorMilimetro=((float)factorEncoder*pulsosPorRev)/circunferenciaRueda; 
 const float distanciaCentroARueda=87.5;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
 const float conversionMicroSaMin=1/(60 * 1000000);// factor de conversion microsegundo (unidades del tiempo muestreo) a minuto
@@ -28,10 +29,19 @@ const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (
 const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
 //constantes para control PID de velocidad (están unidas con la constante de tiempo por simplificación de la ecuación)
-const float velRequerida=180.0; //unidades mm/s
+/*const float velRequerida=180.0; //unidades mm/s
 const float KpVel=2.0; //constante control proporcional
 const float KiVel=30.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
+*/
+
+const float velRequerida=180.0; //unidades mm/s
+const float KpVel=0.90; //constante control proporcional
+const float KiVel=1.0 * tiempoMuestreoS; //constante control integral
+const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
+
+
+
 //constantes para control PID de giro 
 const float KpGiro=1.8; //constante control proporcional
 const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
@@ -72,7 +82,8 @@ int unidadAvance= 400; //medida en mm que avanza cada robot por movimiento
 int unidadRetroceso= -100; //medida en mm que retrocede el robot al encontrar un obstáculo
 int limiteRetroceso= 5000; //Máximo tiempo (ms) permitido para completar el retroceso, si no termina en ese tiempo asume que tiene un obstaculo atras
 unsigned long tiempoRetroceso=0; //Almacena el momento en que se cambia a estado de retroceso para usar el limite de tiempo
-
+int limiteGiro= 5000; //Máximo tiempo permitido para completar el giro, permite que siga el movimiento si no se puede completar el giro por obstaculo o no se logra estado estacionario
+unsigned long tiempoGiro=0; //Almacena el momento en que se cambia al estado de giro
 
 //VARIABLES GLOBALES
 
@@ -118,6 +129,10 @@ byte estadoEncoderIzq = 1;
 //Variables para el almacenar datos de obstáculos
 int datosSensores[longitudArregloObstaculos][6]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
 int ultimoObstaculo = -1; //Apuntador al último obstáculo en el arreglo. Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
+int minEnviado = 0; //Almacena el recorrido de la lista de obstaculos
+bool nuevoObstaculo = false; //Bandera verdadera cuando se detecta un nuevo obstaculo
+unsigned long tiempoSTM = 0; //Almacena el tiempo de muestreo del STM
+
 
 //Variables para el algoritmo de exploración
 int distanciaAvanzada = 0;
@@ -139,6 +154,7 @@ float yoff = 0; //offset de calibración en y
 float angulo = 0; //angulo del elipsoide que forman los datos
 float factorEsc = 1; //factor para convertir el elipsoide en una circunferencia
 float magInicial=0; //valor de orientación inicial
+float orientacion=0; //Usado en ActualizarUbicacion
 
 //Variables para el MPU6050
 long tiempoPrev = 0;
@@ -161,7 +177,7 @@ RH_RF69 rf69(RFM69_CS, RFM69_INT); // Inicialización del driver de la bibliotec
 //Variables para el mensaje que se va a transmitir a la base
 
 uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN]; //Buffer para recibir mensajes.
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
@@ -196,7 +212,8 @@ void setup() {
   pinMode(PWMB, OUTPUT);
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
-  pinMode(INT_OBSTACULO, INPUT_PULLUP);
+  //pinMode(INT_OBSTACULO, INPUT_PULLUP);
+  pinMode(INT_OBSTACULO,OUTPUT);
 
   pinMode(ENC_DER_C1, INPUT); //Declarar pines de encoder como entradas al no usarse como interrupción
   pinMode(ENC_DER_C2, INPUT); 
@@ -206,10 +223,10 @@ void setup() {
   delay(1000); //delay para evitar interrupciones al arrancar
   //asignación de interrupciones
   //attachInterrupt(ENC_DER_C1, PulsosRuedaDerechaC1,CHANGE);  //conectado el contador C1 rueda derecha
-  //attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE); 
+  attachInterrupt(ENC_DER_C2, PulsosRuedaDerechaC2,CHANGE);
   //attachInterrupt(ENC_IZQ_C1, PulsosRuedaIzquierdaC1,CHANGE);  //conectado el contador C1 rueda izquierda
-  //attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
-  attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
+  attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2,CHANGE);
+  //attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
    //temporización y varibales aleatorias
   tiempoActual=micros(); //para temporización de los ciclos
   randomSeed(analogRead(A5)); //Para el algoritmo de exploración, el pinA5 está al aire
@@ -295,15 +312,22 @@ void setup() {
 void loop(){
 
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 
   //***No quitar
   //Revisión de los encoders de los motores (tipo polling para no afectar la comunicación con Ints)
-  revisaEncoders(); 
+  //revisaEncoders(); 
+
+  //
+  RecorrerObstaculos();
+
+  RevisarSTM();
+
+  //Serial.println(estado);
   
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
   if((micros()-tiempoActual)>=tiempoMuestreo){
-
+     //Serial.println(estado); Serial.println(); //
      tiempoActual=micros();
      
      //Máquina de estados que cambia el modo de operación
@@ -311,9 +335,11 @@ void loop(){
   
         case AVANCE:  { 
           bool avanceTerminado= AvanzarDistancia(unidadAvance); 
+          //bool avanceTerminado= true; 
           if (avanceTerminado){
-            ActualizarUbicacion(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
+            ActualizarUbicacionReal(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
             ConfiguracionParar(); 
+            CrearObstaculo(0,0,0); //Si completa el avance crea un obstaculo 0 para indicar que no encontro obstaculos
             estado = ESCOGER_DIRECCION;
             //estado = RETROCEDA; 
           }        
@@ -322,12 +348,18 @@ void loop(){
 
         case RETROCEDA:  { 
           bool avanceTerminado= AvanzarDistancia(unidadRetroceso); 
+          //bool avanceTerminado= true; 
           //Serial.println("Retrocediendo...");
+          
+          if ((millis() - tiempoRetroceso) > limiteRetroceso){ //Si pasa mas del limite de tiempo tratando retroceder detiene el retroceso, probablemente esté bloqueado y no tiene sensores atras
+            avanceTerminado = true;
+          }
+          
           if (avanceTerminado){
-            ActualizarUbicacion(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
+            ActualizarUbicacionReal(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
             ConfiguracionParar();
             estado = ESCOGER_DIRECCION; 
-          }        
+          }   
           break; 
         }
         
@@ -355,16 +387,28 @@ void loop(){
           anguloInicial= medirMagnet(); //guardar el angulo antes de comenzar el giro
           resetMPU(); //resetea las variables globlales del MPU para un giro nuevo
           resetVarDif(); //resetea las variables globales utilizadas para medir el giro real
+
+          //Para evitar estado de giro permanente
+          if(estado!=GIRO){ //Si no se encontraba en giro almacenar el tiempoGiro
+            tiempoGiro=millis(); //Almacena el tiempo cuando se cambio a giro para comparar con el limite
+          }
+          
           estado= GIRO;
         }
   
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
           //dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
+
+          if ((millis() - tiempoGiro) > limiteGiro){ //Si pasa mas del limite de tiempo tratando de girar se detiene y lo trata como si hubiera completado el giro, evita que se quede intentando girar si está bloqueado
+            giroTerminado = true;
+          }
+          
           if(giroTerminado){
             dif=GiroReal(anguloInicial,medirMagnet()); 
+            //dif=medirMagnet();
             //digitalWrite(13,LOW);
-            poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
+            //poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
             Serial.print("Giro real: "); Serial.println(dif);
             estado=AVANCE;
@@ -378,6 +422,17 @@ void loop(){
 }
 
 
+void RevisarSTM(){ //Comunica al STM mediante pin de interrupcion que esta listo para recibir información de obstaculos 
+  if((micros()-tiempoSTM)>=tiempoMuestreo/4){ //Atender obstaculos 4 vecespor cada ciclo de la maquina de estados
+    tiempoSTM=micros();
+    if(estado!=RETROCEDA){ //Ignorar al STM si está retrocediendo
+      digitalWrite(INT_OBSTACULO,HIGH);
+      //delay(5);
+      digitalWrite(INT_OBSTACULO,LOW);
+      delay(5);
+    }
+  }
+}
 
 void RecibirI2C (int cantidad)  {
   //Función (tipo Evento) llamada cuando se recibe algo en el puerto I2C conectado al STM32
@@ -387,6 +442,7 @@ void RecibirI2C (int cantidad)  {
   int distancia = 0;
   int angulo = 0;
   String acumulado = "";
+  DeteccionObstaculo();
 
   while (0 < Wire.available()) { // ciclo mientras se reciben todos los datos
     char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
@@ -409,19 +465,6 @@ void RecibirI2C (int cantidad)  {
     }
   }
 
-  //Almacenamiento de datos en el arreglo de datos de los sensores
-  if (ultimoObstaculo == longitudArregloObstaculos - 1) { //si llega al final del arreglo regresa al inicio, sino suma 1
-    ultimoObstaculo = 0;
-  } else {
-    ultimoObstaculo++;
-  }
-  datosSensores[ultimoObstaculo][0] = poseActual[0]; //Guarda la pose actual donde se detectó el obstáculo
-  datosSensores[ultimoObstaculo][1] = poseActual[1];
-  datosSensores[ultimoObstaculo][2] = poseActual[2];
-  datosSensores[ultimoObstaculo][3] = tipoSensor;
-  datosSensores[ultimoObstaculo][4] = distancia;
-  datosSensores[ultimoObstaculo][5] = angulo;
-
   float alphaObs = (float)(medirMagnet() + angulo);
   if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
     alphaObs = alphaObs - 360;          
@@ -438,12 +481,64 @@ void RecibirI2C (int cantidad)  {
     alphaObs = alphaObs + 360;
   }
 
+  CrearObstaculo(tipoSensor, distancia, alphaObs);
+/*
+  //Almacenamiento de datos en el arreglo de datos de los sensores
+  if (ultimoObstaculo == longitudArregloObstaculos - 1) { //si llega al final del arreglo regresa al inicio, sino suma 1
+    ultimoObstaculo = 0;
+  } else {
+    ultimoObstaculo++;
+  }
+  datosSensores[ultimoObstaculo][0] = poseActual[0]; //Guarda la pose actual donde se detectó el obstáculo
+  datosSensores[ultimoObstaculo][1] = poseActual[1];
+  datosSensores[ultimoObstaculo][2] = poseActual[2];
+  datosSensores[ultimoObstaculo][3] = tipoSensor;
+  datosSensores[ultimoObstaculo][4] = distancia;
+  datosSensores[ultimoObstaculo][5] = alphaObs;
+
+  nuevoObstaculo = true;
+  */
   //obstaculoEnviado = false;
-  CrearMensaje(tipoSensor, distancia, alphaObs);
+  //CrearMensaje(poseActual[0], poseActual[1], poseActual[2], tipoSensor, distancia, alphaObs);
   
 }
 
-void CrearMensaje(int tipoSensorX, int distanciaX, int anguloX){ //Crea el mensaje que la interrupción del TDMA envia
+void CrearObstaculo(int tipoSensor, int distancia, int angulo){ //Agrega un nuevo onstaculo a la lista, usa la poseActual global cuando se llama
+  if (ultimoObstaculo == longitudArregloObstaculos - 1) { //si llega al final del arreglo regresa al inicio, sino suma 1
+    ultimoObstaculo = 0;
+  } else {
+    ultimoObstaculo++;
+  }
+  datosSensores[ultimoObstaculo][0] = poseActual[0]; //Guarda la pose actual donde se detectó el obstáculo
+  datosSensores[ultimoObstaculo][1] = poseActual[1];
+  datosSensores[ultimoObstaculo][2] = poseActual[2];
+  datosSensores[ultimoObstaculo][3] = tipoSensor;
+  datosSensores[ultimoObstaculo][4] = distancia;
+  datosSensores[ultimoObstaculo][5] = angulo;
+
+  nuevoObstaculo = true;
+}
+
+void RecorrerObstaculos(){ //Recorre la lista de obstaculos empezando desde el ultimo recibido, permite enviar mensajes anteriores cuando el robot no está detectando nada
+  if(!mensajeCreado){ //Verifica que se envio el ultimo mensaje creado para no recorrer la lista sin necesidad
+    if(nuevoObstaculo){ //Si se recibio un nuevo obstaculo reiniciar el recorrido de la lista desde ultimoObstaculo
+      nuevoObstaculo = false;
+      minEnviado = ultimoObstaculo;
+    }
+    
+    else{
+      if(minEnviado>0){
+        minEnviado = minEnviado -1;
+      }
+    }
+      
+    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]);
+    //RecibirI2C(0);
+    //CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], estado, medirMagnet(), orientacion); //Para enviar otros datos en pruebas
+  }
+}
+
+void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int distanciaX, int anguloX){ //Crea el mensaje que la interrupción del TDMA envia
   
   if(timeReceived && !mensajeCreado){       //Aquí solo debe enviar mensajes, pero eso lo hace la interrupción, así que aquí se construyen mensajes y se espera a que la interrupción los envíe.
 
@@ -451,9 +546,9 @@ void CrearMensaje(int tipoSensorX, int distanciaX, int anguloX){ //Crea el mensa
 
     //Genero números al azar acorde a lo que el robot eventualmente podría enviar
     float robotID = (float)idRobot;         //Esta variable se debe volver a definir, pues idRobot al ser global presenta problema al crear el mensaje.
-    float xP = (float)poseActual[0];        //Posición X en que se detecto el obstaculo
-    float yP = (float)poseActual[1];        //Posición Y en que se detecto el obstaculo
-    float phi = (float)poseActual[2];       //"Orientación" del robot
+    float xP = (float)poseX;                //Posición X en que se detecto el obstaculo
+    float yP = (float)poseY;                //Posición Y en que se detecto el obstaculo
+    float phi = (float)rotacion;            //"Orientación" del robot
     float tipo = (float)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
     float rObs = (float)distanciaX;         //Distancia medida por el sharp si aplica
     float alphaObs = (float)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
@@ -506,27 +601,28 @@ void DeteccionObstaculo(){
 //Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
 //Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
 
-  if(giroTerminado==1 && millis()>5000){ 
+  if(giroTerminado==1 && millis()>300){ 
     //Solo se atiende interrupción si no está haciendo un giro, sino todo sigue igual, 
-    //y para que ignore las interrupciones los primeros 5s al encederlo
-   //digitalWrite(13,HIGH);
-   Serial.print("INT OBS!  ");
-   Serial.print(datosSensores[ultimoObstaculo][3]);
-   Serial.print("  d: ");
-   Serial.print(datosSensores[ultimoObstaculo][4]);
-   Serial.print("  ang: ");
-   Serial.println(datosSensores[ultimoObstaculo][5]);
-   delay(10);
-   ActualizarUbicacion(); //Como se interrumpió un movimiento, actualiza la ubicación actual
-   ConfiguracionParar(); //Se detiene un momento y reset de encoders 
-
-   if(estado!=RETROCEDA){ //Si no se encontraba en retroceso por una detección anterior almacenar el tiempoRetroceso
-    tiempoRetroceso=millis(); //Almacena el tiempo cuando se cambio a retroceso para comparar con el limite
-   }
-   estado=RETROCEDA;
+    //y para que ignore las interrupciones los primeros 3s al encederlo
+    /*Serial.print("INT OBS!  ");
+    Serial.print(datosSensores[ultimoObstaculo][3]);
+    Serial.print("  d: ");
+    Serial.print(datosSensores[ultimoObstaculo][4]);
+    Serial.print("  ang: ");
+    Serial.println(datosSensores[ultimoObstaculo][5]);
+    delay(10);*/
+    ActualizarUbicacionReal(); //Como se interrumpió un movimiento, actualiza la ubicación actual
+    ConfiguracionParar(); //Se detiene un momento y reset de encoders 
+    
+    
+    if(estado!=RETROCEDA){ //Si no se encontraba en retroceso por una detección anterior almacenar el tiempoRetroceso
+      tiempoRetroceso=millis(); //Almacena el tiempo cuando se cambio a retroceso para comparar con el limite
+      estado=RETROCEDA;
+    }
   }   
 }
 
+/*
 void ActualizarUbicacion() {
   //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual
   distanciaAvanzada = (int)calculaDistanciaLinealRecorrida();
@@ -542,6 +638,7 @@ void ActualizarUbicacion() {
   else if (abs(poseActual[2]) == 180) {
     poseActual[1] = poseActual[1] - distanciaAvanzada;
   }
+  
   Serial.print("Pose=>  X: ");
   Serial.print(poseActual[0]);
   Serial.print("  Y: ");
@@ -549,6 +646,31 @@ void ActualizarUbicacion() {
   Serial.print("  Theta: ");
   Serial.println(poseActual[2]);
   delay(10);
+}
+*/
+
+void ActualizarUbicacionReal() {
+  //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual dada por el magnetometro
+  //float orientacion = medirMagnet() - magInicial; //Toma la orientación como la lectura del magnetometro menos la orientación inicial para que el eje de referencia este orientado a como inicio
+
+  orientacion = (float)(medirMagnet() - magInicial); //Orientacion del robot
+  if(orientacion > 180){ //Correción para tener valores entre -180 y 180
+    orientacion = orientacion - 360;          
+  }
+  else if(orientacion < -180){
+    orientacion = orientacion + 360;
+  }
+
+  poseActual[2] = orientacion;
+
+  orientacion = PI * orientacion / 180; //Conversion a radianes para trigonometria
+  
+  distanciaAvanzada = (int)calculaDistanciaLinealRecorrida();
+
+  //Calcular nueva posición basado en la distancia y el angulo en que se movio (convertir coordenadas polares a rectangulares)
+  poseActual[0] = poseActual[0] + (distanciaAvanzada * cos(orientacion)); //coordenada X
+  poseActual[1] = poseActual[1] + (distanciaAvanzada * sin(orientacion)); //coordenada Y
+
 }
 
 void RevisaObstaculoPeriferia() {
@@ -573,6 +695,7 @@ void RevisaObstaculoPeriferia() {
       }
     }
   }
+  /*
   Serial.print("ObsPeri=>  I:");
   Serial.print(obstaculoIzquierda);
   Serial.print("  A:");
@@ -580,6 +703,7 @@ void RevisaObstaculoPeriferia() {
   Serial.print("  D:");
   Serial.println(obstaculoDerecha);
   delay(10);
+  */
 }
 
 void AsignarDireccionRWD() {
@@ -690,7 +814,6 @@ int ControlPosGiroRueda( float posRef, float posActual, float& sumErrorGiro, flo
 }
 
 void ConfiguraEscribePuenteH (int pwmRuedaDer, int pwmRuedaIzq) {
-
   //Determina si es giro, avance, o retroceso en base a los valores de PWM y configura los pines del Puente H
   if (pwmRuedaDer >= 0 && pwmRuedaIzq >= 0) {
     ConfiguracionAvanzar();
@@ -925,6 +1048,7 @@ bool AvanzarDistancia(int distanciaDeseada) {
   }
 
   velActualDerecha= calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
+  Serial.print(contPulsosDerecha); Serial.print(" ,"); Serial.println(contPulsosDerPasado); Serial.print(" ,"); Serial.println(velActualDerecha);
   int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(velSetPoint, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
 
   velActualIzquierda= -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
@@ -943,6 +1067,8 @@ bool AvanzarDistancia(int distanciaDeseada) {
   ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
 
   float distanciaAvanzada= calculaDistanciaLinealRecorrida();
+
+//Serial.println(distanciaAvanzada);
   
   bool avanceListo = false; 
   if (abs(distanciaAvanzada) >= abs(distanciaDeseada)) {
@@ -988,6 +1114,12 @@ float calculaDistanciaLinealRecorrida() {
 }
 
 int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, float& errorAnteriorVel ) {
+
+  //Serial.print("velRef: "); Serial.println(velRef);
+  //Serial.print("velActual: "); Serial.println(velActual);
+  //Serial.print("sumErrorVel: "); Serial.println(sumErrorVel);
+  //Serial.print("errorAnteriorVel: "); Serial.println(errorAnteriorVel);
+  //Serial.println();
   //Funcion para implementar el control PID por velocidad en una rueda.
   //Se debe tener un muestreo en tiempos constantes, no aparecen las constantes de tiempo en la ecuación, sino que se integran con las constantes Ki y Kd
   //Se recibe la posición de referencia, la posición actual (medida con los encoders), el error acumulado (por referencia), y el valor anterior del error (por referencia)
@@ -1004,7 +1136,7 @@ int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, fl
   float difErrorVel = (errorVel - errorAnteriorVel);
 
   //ecuación de control PID
-  float pidTermVel = (KpVel * errorVel) + (KiVel * sumErrorVel) + (KdVel * difErrorVel);
+  float pidTermVel = (KpVel * errorVel) + (KiVel * sumErrorVel) + (KdVel * difErrorVel)/5;  //Agregada división entre 5 porque PID saturaba, buscar donde está el error
 
   //Se limita los valores máximos y mínimos de la acción de control, para no saturarla
   pidTermVel = constrain( (int)pidTermVel, limiteInferiorCicloTrabajoVelocidad, limiteSuperiorCicloTrabajoVelocidad);
@@ -1077,7 +1209,8 @@ float GiroReal(float angInicial, float angFinal) {
   }
   if (cuadranteFinal != cuadranteAnterior) {cuadranteCambio = cuadranteAnterior;} //detecta cambio de cuadrante
   cuadranteAnterior = cuadranteFinal; //guardar el ultimo cuadrante
-  return (difMag*0.6+abs(difMPU)*0.4); //calcula el promedio ponderador entre los valores del giroscopio y magnetometro
+  //return (difMag*0.6+abs(difMPU)*0.4); //calcula el promedio ponderador entre los valores del giroscopio y magnetometro
+  return (difMag*1.0+abs(difMPU)*0.0); //calcula el promedio ponderador entre los valores del giroscopio y magnetometro
 }
 
 void resetVarDif() {
@@ -1109,7 +1242,7 @@ int buscaCuadrante(float angulo) {
 
 void origenMagnet(){ //Mide la orientación y guarda un promedio
   float x=0;
-  for(int i=0; i<25; i++){
+  for(int i=0; i<25; i++){ //Medir orientacion con el magnetometro 25 veces y sacar un promedio
     x = x + medirMagnet();
   }
   magInicial = x/25;

@@ -8,11 +8,11 @@ x Mejorar los giros ante obstáculos. Ahora solo hace el giro y a veces se pega.
 
 x El usar interrupciones para los encoders está trayendo problemas para la comunicación. Sería bueno revisarlos en polling nada más. (JCB)
 
-- A veces se queda el robot pegado, sigue enviando mensajes y gira el Sharp. Pero no sabemos por qué.
+x A veces se queda el robot pegado, sigue enviando mensajes y gira el Sharp. Pero no sabemos por qué.
 
-- A veces el robot colapsa (no se mueve ni el sharp), pero si manda mensajes (al parecer). Revisar qué pasa.
+x A veces el robot colapsa (no se mueve ni el sharp), pero si manda mensajes (al parecer). Revisar qué pasa.
 
-- A veces los robots no se detectan entre sí. Pensar en un agregado para el frame de acrílico, o una nueva versión del frame. 
+x A veces los robots no se detectan entre sí. Pensar en un agregado para el frame de acrílico, o una nueva versión del frame. 
 
 - Los giros aún duran mucho, porque se queda un toque corrigiendo. Hay que encontrar el juego correcto entre la manera de encontrar el estado estacionario y las constantes PID.
 
