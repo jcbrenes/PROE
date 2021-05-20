@@ -196,6 +196,7 @@ int b = 0;
 
 //Variables para llamar a GiroReal() en la maquina de estados
 float anguloInicial;
+float anguloAct;
 float dif;
 
 //Variables para medir el desplazamiento angular con el magnetómetro
@@ -255,7 +256,14 @@ void setup() {
   acx_off = leerDatoFloat(28);
   acy_off = leerDatoFloat(32);
   acz_off = leerDatoFloat(36);
-
+  
+  float a;
+  //Para estabilizar el filto del magnetometro
+  for(int i=0;i<25;i++){
+      a=medirMagnet();
+    }
+  
+  
   pinMode(RFM69_RST, OUTPUT);
   digitalWrite(RFM69_RST, LOW);
 
@@ -398,6 +406,7 @@ void loop(){
   
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
+
           //dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
 
           if ((millis() - tiempoGiro) > limiteGiro){ //Si pasa mas del limite de tiempo tratando de girar se detiene y lo trata como si hubiera completado el giro, evita que se quede intentando girar si está bloqueado
@@ -1209,6 +1218,7 @@ float GiroReal(float angInicial, float angFinal) {
   }
   if (cuadranteFinal != cuadranteAnterior) {cuadranteCambio = cuadranteAnterior;} //detecta cambio de cuadrante
   cuadranteAnterior = cuadranteFinal; //guardar el ultimo cuadrante
+
   //return (difMag*0.6+abs(difMPU)*0.4); //calcula el promedio ponderador entre los valores del giroscopio y magnetometro
   return (difMag*1.0+abs(difMPU)*0.0); //calcula el promedio ponderador entre los valores del giroscopio y magnetometro
 }
@@ -1260,14 +1270,15 @@ void inicializaMagnet() {
   myWire.write(0x1D); // Set the Register
   myWire.endTransmission();
 }
+
 float medirMagnet() {
   //Funcion que extrae los datos crudos del magnetometro, carga los valores de calibracion
   //desde la memoria eeprom, adicionalmente usa un filtro para la toma de datos (media movil)
   //retorna el angulo en un rango de [0,+-180]
   short x, y, z;
   float xof, yof, xrot, yrot, xf, yf;
-  //Realiza un for parta tomar 15 mediciones basura buscando que se estabilice el filtro
-  for (int i = 0; i <= 15; i++) {
+  //establece comunicación con el magnetómetro
+    
     myWire.beginTransmission(addr);
     myWire.write(0x00); //start with register 3.
     myWire.endTransmission();
@@ -1281,10 +1292,11 @@ float medirMagnet() {
       z = myWire.read(); //LSB z
       z |= myWire.read() << 8; //MSB z
     }
-    //Corrige los datos con base en los valores de la calibracion
+    //Etapa de filtrado de datos
     xft = x * alfa + (1 - alfa) * xft;
     yft = y * alfa + (1 - alfa) * yft;
-  }
+    
+  
   //Sustrae los offset
   xof = xft - xoff;
   yof = yft - yoff;
