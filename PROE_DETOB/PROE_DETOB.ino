@@ -16,7 +16,7 @@ Adicionalmente tiene tres salidas conectadas a leds para notificación y un swit
 
 #include <Servo.h>
 #include <Wire.h>                      
-#include <SoftWire.h>  //Biblioteca para comunicación i2c
+//#include <SoftWire.h>  //Biblioteca para comunicación i2c
 
 Servo myServo;
 
@@ -41,7 +41,7 @@ const int servoDelay=5; //Tiempo entre cada paso del servo en milisegundos
 const float distanciaMinimaSharp=140; //Distancia mínima en milimetros para detección de obstáculos
 const int debounceTime=400; //Debounce para sensor IR frontal
 const float maxTemp=50; //Temperatura de detección de fuego
-const int movimientoMaximo=110; //Maxima rotacion en grados realizada por el servo que rota el sharp
+const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el servo que rota el sharp
 
 //Variables globales//
 int angulo=0;
@@ -51,7 +51,7 @@ float distancia=0;
 float filtrado=0;
 int cuentaBateria=0;
 int sensorIRdetectado=0;
-unsigned long millisAnterior=0;
+uint32_t millisAnterior=0;
 int servoPos=0;
 int incremento=1; //cantidad de grados que aumenta el servo en cada movimiento
 bool ledON = false; 
@@ -61,10 +61,18 @@ unsigned long millisLED=0;
 int c=0; //Pulso de led para ver actividad del STM
 unsigned long lastSend=0; //Almacena cuando se envio el ultimo obstaculo para evitar saturar la comunicación
 const int sendDelay=100; //Tiempo minimo en ms entre cada envio de obstaculo (evita crash del stm)
+char dato2[50];
+bool nuevoObstaculo = false;
+unsigned long tiempoObstaculo=0; //Guarda en que momento se detecto el ultimo obstaculo
+const int maxTiempoObstaculo=200; //Si no se atiende un obstaculo en 200ms se ignora
+
+unsigned long lastPoll=0; //Almacena tiempo de ultima lectura de sensores IR
+unsigned long pollingTime=100; //Tiempo minimo entre lectura de sonsores IR
+int lastIR=0; //Ultimo sensor IR que se detecto, evita repetir mensajes
 
 
 void setup() {
-  myServo.attach(serv); //Une el objeto myServo al pin del servo (serv)
+  myServo.attach(serv,500,1600); //Une el objeto myServo al pin del servo (serv, min, max) valores en us para mover el servo a su posición minima y máxima (calibración)
 
   //Configuración de pines//
   pinMode(irFrontal, INPUT);
@@ -76,33 +84,38 @@ void setup() {
   pinMode(led2, OUTPUT);
   pinMode(led3, OUTPUT);
   pinMode(temp, INPUT);
-  pinMode(int1, OUTPUT);
+  //pinMode(int1, OUTPUT);
+  pinMode(int1, INPUT);
   pinMode(sharp, INPUT);
 
   delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
   
   //Configuración de interrupciones//
-  attachInterrupt(irFrontal, irFrontalSend, FALLING); //Activo bajo
-  attachInterrupt(irLeft, irLeftSend, RISING); //Activo alto
-  attachInterrupt(irRight, irRightSend, RISING); //Activo alto
+  //attachInterrupt(irFrontal, irFrontalSend, FALLING); //Activo bajo
+  //attachInterrupt(irLeft, irLeftSend, RISING); //Activo alto
+  //attachInterrupt(irRight, irRightSend, RISING); //Activo alto
+  attachInterrupt(int1, featherListo, FALLING); 
 
   //Configuración de perifericos//
   Wire.begin();           //Inicia comunicación i2c como master
-  //Serial1.begin(115200);  //Inicia la comunicación serial a 115200 baud
-  //Serial1.println("On");  //Enviar un "on" por el serial para confirmar que el setup se ejecutó correctamente
+  Serial1.begin(115200);  //Inicia la comunicación serial a 115200 baud
+  Serial1.println("On");  //Enviar un "on" por el serial para confirmar que el setup se ejecutó correctamente
+
 
   myServo.write(movimientoMaximo/2); //Coloca el servo en el centro para confirmar alineación
+  //myServo.writeMicroseconds(1500);
   delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
 }
  
 void loop() {
-  moverServo();
-  revisarSharp();
-  revisarSensoresIR();
+  moverServo(); //Serial1.println("Servo");
+  revisarSharp(); //Serial1.println("Sharp");
+  pollingSensoresIR(); //Serial1.println("Poll");  //Leer sensores IR por polling
+  revisarSensoresIR(); //Serial1.println("IR");
   //revisarTemperatura(); //desactivado mientras no está soldado el sensor al PCB
-  revisarBateria();
-  encenderLED(); //enciende un led si alguna función lo activó 
-  actividad(); //Parpadea led amarillo para confirmar actividad del stm
+  revisarBateria(); //Serial1.println("Bat");
+  encenderLED(); //Serial1.println("LED"); //enciende un led si alguna función lo activó 
+  actividad(); //Serial1.println("Actividad");//Parpadea led amarillo para confirmar actividad del stm
   
 }
 
@@ -130,11 +143,12 @@ void encenderLED(){ //Se encarga de encender el LED por un tiempo determinado. S
 }
 
 void revisarSharp(){ //Revisa el valor del sensor Sharp
+    //Serial1.println("Sharp");
     lectura=analogRead(sharp);
     filtrado=filtrado-(beta*(filtrado-lectura)); //Filtro de media movil
     distancia=1274160*pow(filtrado,-1.174); //Regresión lineal de datos experimentales para obtener distancia en milimetros
     if ((distancia<distanciaMinimaSharp) & (angulo!=anguloAnterior)){ //revisa distancia umbral y que solo se haga un envío por cada ángulo
-      enviarDato(1,int(distancia),angulo); //Enviar obstaculo tipo 1 con distancia en cm y angulo
+      enviarDato2(1,int(distancia),angulo); //Enviar obstaculo tipo 1 con distancia en cm y angulo
     }
     anguloAnterior=angulo;
 }
@@ -146,7 +160,7 @@ void revisarTemperatura(){ //Lectura del sensor de temperatura
   //Serial1.println(temperatura);
   if(temperatura>maxTemp){ //Valor máximo de temperatura aceptable
     int i = int(temperatura);
-    enviarDato(5,i,0);
+    enviarDato2(5,i,0);
     //Serial1.println("T");
   }
 }
@@ -156,11 +170,31 @@ void revisarBateria(){ //Revisar la batería cada 20 ciclos del loop, codigo 6
     digitalWrite(led1,HIGH); //Encender led rojo si la batería está baja
     cuentaBateria++;
     if(cuentaBateria>=10000){ //Si la bateria esta baja enviar advertencia cada 10000 ciclos del loop principal
-      //enviarDato(6,0,0);
+      //enviarDato2(6,0,0);
       ledON=true;
       onTime=300;
       cuentaBateria=0;
     }
+  }
+}
+
+void pollingSensoresIR(){ //Lectura de sensores IR por polling, prioridad al frontal
+  if((millis() - lastPoll) > pollingTime){
+    if(!digitalRead(irFrontal)){
+      sensorIRdetectado=2;
+    }
+  
+    else if(digitalRead(irRight)){
+      sensorIRdetectado=3;
+    }
+  
+    else if(digitalRead(irLeft)){
+      sensorIRdetectado=4;
+    }
+  
+    else{}
+
+    lastPoll = millis();
   }
 }
 
@@ -171,43 +205,70 @@ void revisarSensoresIR(){ //Revisa si la variable de sensores IR cambio de estad
     case 0:    // no se ha detectado nada
       break;
     case 2:    // sensor IR frontal
-      enviarDato(2,0,0);
+      enviarDato2(2,0,0);
       sensorIRdetectado=0;
       //Serial1.print("F ");
       break;
     case 3:    // sensor IR inferior derecho
-      enviarDato(3,0,0);
+      enviarDato2(3,0,0);
       sensorIRdetectado=0;
       //Serial1.print("R ");
       break;
     case 4:    // sensor IR inferior izquierdo
-      enviarDato(4,0,0);
+      enviarDato2(4,0,0);
       sensorIRdetectado=0;
       //Serial1.print("L ");
       break;
   }
 }
 
+
+
+
 void enviarDato(int caso, int distancia, int angulo){ //Envia el paquete de datos con la información de obstaculo detectado
   if((millis()-lastSend)>sendDelay){ //Solo envia el obstaculo si a pasado el sendDelay desde el ultimo dato enviado
-    //Solo si el obstáculo está en frente activa el pin de interrupción para el feather
-    if (abs(angulo)<=45){
-      digitalWrite(int1,HIGH); //Pulsar salida int1 para indicarle al feather que se detectó un obstaculo y luego enviar los detalles
-      delay(2); //Delay para darle tiempo al feather de que llegue a la interrupcion y se ponga a leer el i2c, puede que no sea necesario
-      digitalWrite(int1,LOW);  
-    }
-  
+    
     char dato[50];
     sprintf(dato, "%d,%d,%d.", caso, distancia, angulo); //Genera un string para la transmisión
+    //Serial1.println("Enviar");
     Wire.beginTransmission(42);           //Comienza transmisión al esclavo 42 (Feather)
     Wire.write(dato);                     //Envia el valor al esclavo
     Wire.endTransmission();               //Detener la transmisión
+    //Serial1.println("Enviado");
     //para visualización, enciende led y muestra el dato
     ledON=true;
     onTime=500;
     lastSend=millis();
     //Serial1.println(dato);
+    
+    //Solo si el obstáculo está en frente activa el pin de interrupción para el feather
+    if (abs(angulo)<=45){
+      //digitalWrite(int1,HIGH); //Pulsar salida int1 para indicarle al feather que se detectó un obstaculo y luego enviar los detalles
+      delay(2); //Delay para darle tiempo al feather de que llegue a la interrupcion y se ponga a leer el i2c, puede que no sea necesario
+      //digitalWrite(int1,LOW);  
+    }
    }
+}
+
+void featherListo(){ //Interrupcion que pide datos al stm cuando el feather los puede recibir
+  if ((millis()-tiempoObstaculo) > maxTiempoObstaculo){ //Si no se antiende un obstaculo en menos de maxTiempoObstaculo se ignora
+    nuevoObstaculo = false;
+  }
+  if (nuevoObstaculo){ //Evita enviar el mismo obstaculo dos veces
+    Wire.beginTransmission(42);           //Comienza transmisión al esclavo 42 (Feather)
+    Wire.write(dato2);                    //Envia el valor al esclavo
+    Wire.endTransmission();               //Detener la transmisión
+    nuevoObstaculo = false;
+    //Serial1.println("Enviado");
+  }
+}
+
+void enviarDato2(int caso, int distancia, int angulo){ //Prepara el paquete de datos con la información de obstaculo detectado    
+  sprintf(dato2, "%d,%d,%d.", caso, distancia, angulo); //Genera un string para la transmisión
+  nuevoObstaculo = true;
+  tiempoObstaculo = millis();
+  ledON=true;
+  onTime=300;
 }
 
 void actividad(){
