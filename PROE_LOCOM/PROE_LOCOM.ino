@@ -23,7 +23,7 @@ const int factorEncoder=2; //cantidad de tipos de pulsos que se están detectand
 const float circunferenciaRueda=139.5;//Circunferencia de la rueda = 139.5mm 
 //const float circunferenciaRueda=175.5;//Circunferencia de la rueda = 139.5mm 
 const float pulsosPorMilimetro=((float)factorEncoder*pulsosPorRev)/circunferenciaRueda; 
-const float distanciaCentroARueda=87.5;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
+const float distanciaCentroARueda=63.7;// Radio de giro del carro, es la distancia en mm entre el centro y una rueda. 
 const float conversionMicroSaMin=1/(60 * 1000000);// factor de conversion microsegundo (unidades del tiempo muestreo) a minuto
 const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (unidades del tiempo muestreo) a segundo
 const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
@@ -320,7 +320,7 @@ void setup() {
 void loop(){
 
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 
   //***No quitar
   //Revisión de los encoders de los motores (tipo polling para no afectar la comunicación con Ints)
