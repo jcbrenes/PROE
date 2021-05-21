@@ -147,7 +147,7 @@ int anguloGiro = 0;
 
 //Variables para el magnetómetro y su calibración
 const float declinacionMag = 0.0; //correccion del campo magnetico respecto al norte geográfico en Costa Rica
-const float alfa = 0.2; //constante para filtro de datos
+const float alfa = 1; //constante para filtro de datos
 float xft, yft; //Valores filtrados
 float xoff = 0; //offset de calibración en x
 float yoff = 0; //offset de calibración en y
@@ -156,7 +156,7 @@ float factorEsc = 1; //factor para convertir el elipsoide en una circunferencia
 float magInicial=0; //valor de orientación inicial
 float orientacion=0; //Usado en ActualizarUbicacion
 
-//Variables para el MPU6050
+//Variables para el MPU6050 y su calibración
 long tiempoPrev = 0;
 float gir_ang_zPrev, vel_y_Prev; //angulos previos para determinar el desplazamiento angular
 float gx_off, gy_off, gz_off, acx_off, acy_off, acz_off; // offsets para calibración del MPU6050
@@ -194,16 +194,18 @@ const uint8_t timeOffset = 2; //Offset que existe entre el máster enviando y el
 int c = 0; //Contador para led 13
 int b = 0;
 
-//Variables para llamar a GiroReal() en la maquina de estados
+//Variables para calcular el giro real en la maquina de estados
 float anguloInicial;
-float anguloAct;
-float dif;
+float anguloMagnet;
+float anguloMPU;
+float velMPU;
 
 //Variables para medir el desplazamiento angular con el magnetómetro
+int cuadranteActual;
 int cuadranteAnterior;
-int cuadranteCambio;
-bool cambio12;
-bool cambio21;
+bool complemento=false;
+bool cambio12=false;
+bool cambio21=false;
 
 void setup() {
   //asignación de pines
@@ -256,13 +258,6 @@ void setup() {
   acx_off = leerDatoFloat(28);
   acy_off = leerDatoFloat(32);
   acz_off = leerDatoFloat(36);
-  
-  float a;
-  //Para estabilizar el filto del magnetometro
-  for(int i=0;i<25;i++){
-      a=medirMagnet();
-    }
-  
   
   pinMode(RFM69_RST, OUTPUT);
   digitalWrite(RFM69_RST, LOW);
@@ -392,10 +387,10 @@ void loop(){
         case ESCOGER_DIRECCION: {
           RevisaObstaculoPeriferia(); //Revisa los osbtáculos presentes en la pose actual
           AsignarDireccionRWD(); //Asigna un ángulo de giro en base al algoritmo Random Walk con Dirección
-          anguloInicial= medirMagnet(); //guardar el angulo antes de comenzar el giro
           resetMPU(); //resetea las variables globlales del MPU para un giro nuevo
           resetVarDif(); //resetea las variables globales utilizadas para medir el giro real
-
+          anguloInicial= medirMagnet(); //guardar el angulo antes de comenzar el giro
+          cuadranteAnterior=buscaCuadrante(anguloInicial);
           //Para evitar estado de giro permanente
           if(estado!=GIRO){ //Si no se encontraba en giro almacenar el tiempoGiro
             tiempoGiro=millis(); //Almacena el tiempo cuando se cambio a giro para comparar con el limite
@@ -407,15 +402,19 @@ void loop(){
         case GIRO: {
           giroTerminado=Giro((float)anguloGiro);
 
-          //dif=GiroReal(anguloInicial,medirMagnet());//calcula el giro real mientra se completa
-
+          //Funciones para calcular el giro real haciendo una fusion entre el giroscopio y magnetometro
+          leeMPU(anguloMPU,velMPU); 
+          anguloMagnet=medirMagnet();
+          detectaCambio(anguloMagnet);
+          
           if ((millis() - tiempoGiro) > limiteGiro){ //Si pasa mas del limite de tiempo tratando de girar se detiene y lo trata como si hubiera completado el giro, evita que se quede intentando girar si está bloqueado
             giroTerminado = true;
           }
           
           if(giroTerminado){
-            dif=GiroReal(anguloInicial,medirMagnet()); 
-            //dif=medirMagnet();
+            anguloMagnet=medirMagnet(); //mide el ultimo angulo del magnetometro
+            leeMPU(anguloMPU,velMPU); //mide el ultimo angulo del giroscopio
+            float dif=GiroReal(anguloMPU,anguloInicial,anguloMagnet); //calcula el giro real
             //digitalWrite(13,LOW);
             //poseActual[2]= poseActual[2] + anguloGiro; //Actualiza la orientación. Supongo que no se va a detener un giro a la mitad por un obstáculo
             ConfiguracionParar();
@@ -1161,74 +1160,62 @@ int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, fl
   return  ((int)pidTermVel);
 }
 
-float GiroReal(float angInicial, float angFinal) {
-  //Funcion que determina el desplazamiento angular como un promedio ponderado de los valores que retornan el magnetometro y el giroscopio
-  //entran como parametros los angulos inicial y un angulo final y retorna la diferencia en grados
-  float difMag; //diferencia en grados para el magnetometro 
-  float difMPU,x; //diferencia en grados para giroscopio, la variable x es la velocidad, no es necesaria pero es un parametro por referencia
-  int cuadranteFinal; //guarda el cuadrante en donde se encuentra el angulo final
-  cuadranteFinal = buscaCuadrante(angFinal);
+void detectaCambio(float angulo){
+//Funcion que detecta los cuadrantes que recorre el magnetometro, básicamente detecta si se debe usar la diferencia entre
+//angulo inicial y final del magnetometro o si se usa su complemento, tiene como entrada el angulo del magnetometro
 
-  //Esta es la lógica princial, esta diseñada para determinar cuando hay cambios de cuadrante y calcular con base a esto
-  //la diferencia angular con el magnetometro, también detecta si el robot esta oscilando entre 2 cuadrantes, a su vez
-  //mide el desplazamiento angular con el giroscopio
-  if (cuadranteFinal == 2 and cuadranteAnterior == 1) { 
-    if (cuadranteCambio == 2) { 
-      difMag = abs(angFinal - angInicial);
-      leeMPU(difMPU,x);
-      cambio12 = false;
-      cambio21 = false;
-      resetVarDif();
-    }
-    else {
-      difMag = angInicial + (360 - angFinal);
-      leeMPU(difMPU,x);
-      cambio12 = true;
-      cambio21 = false;
-    }
-  }
-  else if (cuadranteFinal == 1 and cuadranteAnterior == 2) {
-    if (cuadranteCambio == 1) {
-      difMag = abs(angFinal - angInicial);
-      leeMPU(difMPU,x);
-      cambio12 = false;
-      cambio21 = false;
-      resetVarDif();
-    }
-    else {
-      difMag = angFinal + (360 - angInicial);
-      leeMPU(difMPU,x);
-      cambio21 = true;
-      cambio12 = false;
-    }
-  }
-  else {
-    if (cambio21 == true) {
-      difMag = angFinal + (360 - angInicial);
-      leeMPU(difMPU,x);
-    }
-    else if (cambio12 == true) {
-      difMag = angInicial + (360 - angFinal);
-      leeMPU(difMPU,x);
-    }
-    else {
-      difMag = abs(angFinal - angInicial);
-      leeMPU(difMPU,x);
-    }
-  }
-  if (cuadranteFinal != cuadranteAnterior) {cuadranteCambio = cuadranteAnterior;} //detecta cambio de cuadrante
-  cuadranteAnterior = cuadranteFinal; //guardar el ultimo cuadrante
+      int cuadranteActual=buscaCuadrante(angulo); 
 
-  //return (difMag*0.6+abs(difMPU)*0.4); //calcula el promedio ponderador entre los valores del giroscopio y magnetometro
-  return (difMag*1.0+abs(difMPU)*0.0); //calcula el promedio ponderador entre los valores del giroscopio y magnetometro
+      //Segun el cambio entre cuadrante 1-2 o 2-1 se sabe si debe usar complemento o la diferencia normal de angulos
+      if (cambio12 or cambio21){ 
+          if (cuadranteAnterior==1 and cuadranteActual==2){ //cambio de 1 hacia 2
+            if (cambio12){complemento=true;} 
+            else {complemento=false;}
+            }
+          else if(cuadranteAnterior==2 and cuadranteActual==1){ //cambio de 2 hacia 1
+            if (cambio21){complemento=true;}
+            else{complemento=false;}
+            }
+        }
+
+      //Inicializa las variables cambio12 y cambio21
+      else{
+      if (cuadranteAnterior==1 and cuadranteActual==2){
+          cambio12=true;
+          complemento=true;
+      }
+      else if (cuadranteAnterior==2 and cuadranteActual==1){
+            cambio21=true;
+            complemento=true;
+        }
+      }
+
+     //guarda el cuadrante anterior
+     cuadranteAnterior=cuadranteActual; 
+}
+
+float GiroReal(float angMPU, float angMagInicial, float angMagFinal) {
+//Funcion que calcula el giro real como un promedio ponderado entre los valores del giroscopio (yaw)
+//y los valores del magnetometro
+
+    //Realiza el calculo segun el estado de complemento
+    if (complemento){
+      float dif=360-abs(angMagFinal-angMagInicial);
+      return (abs(angMPU)*0.4+dif*0.6);
+      }
+    else{
+      float dif=abs(angMagFinal-angMagInicial);
+      return (abs(angMPU)*0.4+dif*0.6);
+      }
 }
 
 void resetVarDif() {
   //Funcion que resetea las variables globales de la función GiroReal
   cuadranteAnterior = NULL;
-  cuadranteCambio = NULL;
-  cambio12 = false;
-  cambio21 = false;
+  cuadranteActual = NULL;
+  cambio12=false;
+  cambio21=false;
+  complemento=false; 
 }
 
 int buscaCuadrante(float angulo) {
@@ -1296,7 +1283,6 @@ float medirMagnet() {
     xft = x * alfa + (1 - alfa) * xft;
     yft = y * alfa + (1 - alfa) * yft;
     
-  
   //Sustrae los offset
   xof = xft - xoff;
   yof = yft - yoff;
@@ -1315,7 +1301,6 @@ float medirMagnet() {
   //Obtiene el alguno con respecto al norte
   float angulo = atan2(yf, xf);
   angulo = angulo * (180 / PI); //convertimos de Radianes a grados
-  angulo = angulo - declinacionMag; //corregimos la declinación magnética
   //Mostramos el angulo entre el eje X y el Norte
   if (angulo < 0.0) {
     angulo = angulo + 360;
