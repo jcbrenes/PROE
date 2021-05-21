@@ -18,20 +18,21 @@ const float pulsosPorRev = 206.0; //cantidad de pulsos de una única salida
 const int factorEncoder = 4; //cantidad de tipos de pulsos que se están detectando (juego entre las 2 salidas del encoder)
 const float circunferenciaRueda = 139.5; //Circunferencia de la rueda = 139.5mm
 const float pulsosPorMilimetro = ((float)factorEncoder*pulsosPorRev) / circunferenciaRueda;
-const float distanciaCentroARueda = 87.5; // Radio de giro del carro, es la distancia en mm entre el centro y una rueda.
+const float distanciaCentroARueda = 63.7; // Radio de giro del carro, es la distancia en mm entre el centro y una rueda.
 const float conversionMicroSaMin = 1 / (60 * 1000000); // factor de conversion microsegundo (unidades del tiempo muestreo) a minuto
 const float conversionMicroSaSDiv = 1000000; // factor de conversion microsegundo (unidades del tiempo muestreo) a segundo
 const float tiempoMuestreoS = (float)tiempoMuestreo / conversionMicroSaSDiv;
 
 //constantes para control PID de velocidad (están unidas con la constante de tiempo por simplificación de la ecuación)
-const float velRequerida = 50; //unidades mm/s
-const float KpVel = 2; //constante control proporcional
-const float KiVel = 20.0 * tiempoMuestreoS; //constante control integral
-const float KdVel = 0.01 / tiempoMuestreoS ; //constante control derivativo
-//constantes para control PID de giro
-const float KpGiro = 2; //constante control proporcional
-const float KiGiro = 20.0 * tiempoMuestreoS; //constante control integral
-const float KdGiro = 0.08 / tiempoMuestreoS; //constante control derivativo
+const float velRequerida=180.0; //unidades mm/s
+const float KpVel=0.90; //constante control proporcional
+const float KiVel=1.0 * tiempoMuestreoS; //constante control integral
+const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
+
+//constantes para control PID de giro 
+const float KpGiro=1.8; //constante control proporcional
+const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
+const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
 //Constantes para la implementación del control PID real
 const int errorMinIntegral = -250;
