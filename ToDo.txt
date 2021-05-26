@@ -14,14 +14,12 @@ x A veces el robot colapsa (no se mueve ni el sharp), pero si manda mensajes (al
 
 x A veces los robots no se detectan entre sí. Pensar en un agregado para el frame de acrílico, o una nueva versión del frame. 
 
-- Los giros aún duran mucho, porque se queda un toque corrigiendo. Hay que encontrar el juego correcto entre la manera de encontrar el estado estacionario y las constantes PID.
+- Los datos de orientación en la pose son ideales. Actualizarlos con un promedio entre odometría y magnetómetro. Problema: el algoritmo de RandomWalk con dirección se basa en esas direcciones ideales, hay que ver como coordinarlo. (Andrés)
 
-- Los datos de orientación en la pose son ideales. Actualizarlos con un promedio entre odometría y magnetómetro. Problema: el algoritmo de RandomWalk con dirección se basa en esas direcciones ideales, hay que ver como coordinarlo.
+- Revisar la integridad de los datos de ubicación (salió raro en eje X). (Bryan)
 
-- Revisar la integridad de los datos de ubicación (salió raro en eje X).
+x Los giros no tienen deteccion de fallo (choque), ponerle aunque sea un temporizador para que no se quede pegado. (Bryan)
 
-- Los giros no tienen deteccion de fallo (choque), ponerle aunque sea un temporizador para que no se quede pegado. (Bryan)
+x Los giros aún duran mucho, porque se queda un toque corrigiendo. Hay que encontrar el juego correcto entre la manera de encontrar el estado estacionario y las constantes PID. (Bryan) Se corrigió con el temporizador
 
-- Los giros aún duran mucho, porque se queda un toque corrigiendo. Hay que encontrar el juego correcto entre la manera de encontrar el estado estacionario y las constantes PID.
-
-- Mejorar la cantidad de datos que se envían en la comunicación. Pensar cómo enviar más datos en el mismo período de tiempo. Por ejemplo, no enviar datos repetidos. (Bryan)
+- Mejorar la cantidad de datos que se envían en la comunicación. Pensar cómo enviar más datos en el mismo período de tiempo. Por ejemplo, no enviar datos repetidos. (Bryan y JC)
