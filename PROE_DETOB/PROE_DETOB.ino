@@ -15,7 +15,8 @@ Adicionalmente tiene tres salidas conectadas a leds para notificación y un swit
 */
 
 #include <Servo.h>
-#include <Wire_slave.h>                      
+#include <Wire_slave.h>   //para usar el STM32 como secundario en el puerto I2C                   
+//https://github.com/rogerclarkmelbourne/Arduino_STM32/tree/master/STM32F1/libraries/WireSlave 
 
 Servo myServo;
 
