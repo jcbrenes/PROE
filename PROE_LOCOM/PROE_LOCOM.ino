@@ -64,7 +64,7 @@ const int INT_OBSTACULO = A4;
 const int longitudArregloObstaculos = 1000;
 
 //Constantes algoritmo exploración
-const int unidadAvance= 50; //medida en mm que avanza cada robot por movimiento
+const int unidadAvance= 400; //medida en mm que avanza cada robot por movimiento
 const int unidadRetroceso= -100; //medida en mm que retrocede el robot al encontrar un obstáculo
 const unsigned long limiteRetroceso= 5000; //Máximo tiempo (ms) permitido para completar el retroceso, si no termina en ese tiempo asume que tiene un obstaculo atras
 unsigned long tiempoRetroceso=0; //Almacena el momento en que se cambia a estado de retroceso para usar el limite de tiempo
