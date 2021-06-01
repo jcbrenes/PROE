@@ -29,7 +29,7 @@ const float KiVel=1.0 * tiempoMuestreoS; //constante control integral
 const float KdVel=0.01 / tiempoMuestreoS ; //constante control derivativo
 
 //constantes para control PID de giro 
-const float KpGiro=1.5; //constante control proporcional
+const float KpGiro=5.0; //constante control proporcional
 const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
 const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
@@ -38,8 +38,8 @@ const int errorMinIntegral=-250;
 const int errorMaxIntegral=250;
 const int limiteSuperiorCicloTrabajoVelocidad=200;
 const int limiteInferiorCicloTrabajoVelocidad=-200;
-const int limiteSuperiorCicloTrabajoGiro=120;
-const int limiteInferiorCicloTrabajoGiro=-120;
+const int limiteSuperiorCicloTrabajoGiro=110;
+const int limiteInferiorCicloTrabajoGiro=-110;
 const int cicloTrabajoMinimo= 20;
 const int minCiclosEstacionario= 20;
 
@@ -189,9 +189,10 @@ const uint8_t timeOffset = 2; //Offset que existe entre el máster enviando y el
 
 //Variables para calcular el giro real
 float anguloInicial;
-float ultimoAngMagnet=0;
+float ultimoAngMagnet;
 float anguloMPU;
 float velMPU;
+float angActualRobot;
 
 //Variables para medir el desplazamiento angular con el magnetómetro
 int cuadranteActual;
@@ -309,7 +310,7 @@ void setup() {
 void loop(){
 
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 
   //***POLLING*** Acciones que se ejecutan periodicamente. Más frecuentemente que la máquina de estados
   //Revisión de los encoders de los motores (tipo polling para no afectar la comunicación con Ints)
@@ -401,9 +402,8 @@ void loop(){
           }
           
           if(giroTerminado){
-            float dif=GiroReal(anguloMPU,anguloInicial,ultimoAngMagnet); //calcula el giro real
             ConfiguracionParar();
-            //Serial.print("Giro real: "); Serial.println(dif);
+            Serial.print("Giro real: "); Serial.println(angActualRobot);
             estado=AVANCE;
           }
         }
@@ -722,10 +722,14 @@ bool Giro(float grados) {
 //Función que ejecuta el giro del robot sobre su propio eje. Usa control PID en cada rueda
 //Devuelve true cuando se alcanza la posición angular deseada
 
-  posActualRuedaDerecha = ConvDistAngular(contPulsosDerecha);
+  float factorFus=0.7;
+  angActualRobot=GiroReal(anguloMPU,anguloInicial,ultimoAngMagnet); //calcula el giro real
+  
+  posActualRuedaDerecha = ConvDistAngular(contPulsosDerecha)*(1-factorFus)+factorFus*angActualRobot;
+
   int cicloTrabajoRuedaDerecha = ControlPosGiroRueda( grados, posActualRuedaDerecha, sumErrorGiroDer, errorAnteriorGiroDer );
 
-  posActualRuedaIzquierda = ConvDistAngular(contPulsosIzquierda);
+  posActualRuedaIzquierda = ConvDistAngular(contPulsosIzquierda)*(1-factorFus)+factorFus*angActualRobot;
   int cicloTrabajoRuedaIzquierda = ControlPosGiroRueda( -grados, -posActualRuedaIzquierda, sumErrorGiroIzq, errorAnteriorGiroIzq);
 
   ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
@@ -733,6 +737,7 @@ bool Giro(float grados) {
   bool giroListo = EstadoEstacionario (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda, contCiclosEstacionarioGiro);
 
   return giroListo;
+
 }
 
 
@@ -1126,8 +1131,13 @@ float GiroReal(float angMPU, float angMagInicial, float angMagFinal) {
       }else{
       difMag=abs(angMagFinal-angMagInicial);
       }
-    float facFus= 0.4; //factor de cuanto pesa el valor del MPU (valor de 0 a 1)
-    return (abs(angMPU)*facFus + difMag*(1-facFus));
+    float facFus= 0.5; //factor de cuanto pesa el valor del MPU (valor de 0 a 1)
+    if (angMPU>0){
+      return (abs(angMPU)*facFus + difMag*(1-facFus));
+    }
+    else {
+       return -1*(abs(angMPU)*facFus + difMag*(1-facFus));
+      }
 }
 
 
