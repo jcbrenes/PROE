@@ -310,7 +310,7 @@ void setup() {
 void loop(){
 
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 
   //***POLLING*** Acciones que se ejecutan periodicamente. Más frecuentemente que la máquina de estados
   //Revisión de los encoders de los motores (tipo polling para no afectar la comunicación con Ints)
@@ -403,7 +403,7 @@ void loop(){
           
           if(giroTerminado){
             ConfiguracionParar();
-            Serial.print("Giro real: "); Serial.println(angActualRobot);
+            //Serial.print("Giro real: "); Serial.println(angActualRobot);
             estado=AVANCE;
           }
         }
