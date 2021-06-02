@@ -8,7 +8,7 @@
 #include <RH_RF69.h> //Biblioteca para la comunicacion por radio frecuencia
 
 //Variables del enjambre para la comunicación a la base
-uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
 unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 //constantes del robot empleado
