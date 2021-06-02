@@ -23,3 +23,9 @@ x Los giros no tienen deteccion de fallo (choque), ponerle aunque sea un tempori
 x Los giros aún duran mucho, porque se queda un toque corrigiendo. Hay que encontrar el juego correcto entre la manera de encontrar el estado estacionario y las constantes PID. (Bryan) Se corrigió con el temporizador
 
 x Mejorar la cantidad de datos que se envían en la comunicación. Pensar cómo enviar más datos en el mismo período de tiempo. Por ejemplo, no enviar datos repetidos. (Bryan y JC)
+
+- Crear metodología de calibración de servos
+
+- Modificar el escenario (más bajo)
+
+- Modificar la pieza lateral del chasís para poder prender y apagar el robot. 
