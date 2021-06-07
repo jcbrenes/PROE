@@ -629,9 +629,9 @@ void AsignarDireccionRWD() {
   bool derecha=false;
   bool atras=false;
 
-  if (-45.0<=diferenciaOrientacion<=45.0){adelante=true;}
-  else if (45<diferenciaOrientacion<=135.0){derecha=true;}
-  else if (-135.0<=diferenciaOrientacion<-45.0){izquierda=true;}
+  if (-45.0<=poseActual[2]<=45.0){adelante=true;}
+  else if (45<poseActual[2]<=135.0){derecha=true;}
+  else if (-135.0<=poseActual[2]<-45.0){izquierda=true;}
   else {atras=true;}
 
   //En esta condición especial se asigna una nueva dirección global
