@@ -624,18 +624,28 @@ void AsignarDireccionRWD() {
   int maxRandom = 3;
   int incrementoPosible = 90;
 
+   bool adelante=false;
+  bool izquierda=false;
+  bool derecha=false;
+  bool atras=false;
+
+  if (-45.0<=poseActual[2]<=45.0){adelante=true;}
+  else if (45<poseActual[2]<=135.0){derecha=true;}
+  else if (-135.0<=poseActual[2]<-45.0){izquierda=true;}
+  else {atras=true;}
+
   //En esta condición especial se asigna una nueva dirección global
-  if (obstaculoAdelante && diferenciaOrientacion == 0) {
+  if (obstaculoAdelante && adelante) {
     direccionGlobal = (orientacionesRobot)(random(-1, 3) * 90);
   }
   //Si hay un obstáculo o se está en una orientación diferente a la global, se restringen las opciones del aleatorio
-  if (obstaculoIzquierda || diferenciaOrientacion == -90) {
+  if (obstaculoIzquierda || izquierda) {
     minRandom++;
   }
-  if (obstaculoDerecha || diferenciaOrientacion == 90) {
+  if (obstaculoDerecha || derecha) {
     maxRandom--;
   }
-  if (obstaculoAdelante || abs(diferenciaOrientacion) == 180) {
+  if (obstaculoAdelante || atras) {
     incrementoPosible = 180; //Un obstáculo adelante es un caso especial que implica girar a la derecha o izquierda (diferencia de 180°)
     maxRandom--;
   }
