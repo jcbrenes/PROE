@@ -9,16 +9,17 @@ Magenta hojas
 Cyan hojas
 Amarillo hojas
 Naranja hojas
-COMBINACIONES:
-amarillo-naranja
-naranja-amarillo
-amarillo-cyan
-cyan-amarillo
-amarillo-magenta
-magenta-amarillo
-naranja-magenta
-magenta-naranja
-naranja-cyan
-cyan-naranja
-cyan-magenta
-magenta-cyan
+COMBINACIONES [número de combinación]: cyan (1), magenta (2), naranja (3), amarillo (4)
+Círculo grande-círulo pequeño
+EN USO amarillo-naranja [1]
+naranja-amarillo [2]
+amarillo-cyan [3]
+cyan-amarillo [4]
+amarillo-magenta [5]
+EN USO  magenta-amarillo [6]
+naranja-magenta [7]
+magenta-naranja [8]
+naranja-cyan [9]
+cyan-naranja [10]
+EN USO  cyan-magenta [11]
+magenta-cyan [12]
