@@ -83,9 +83,10 @@ def depurar_contornos(cnts):
         #OJO hubo cambio del kernel de la dilatación, de 3,3 a 7,7
         #Se encontró que el área mínima de los círculos pequeños es mayor a 900 unidades aprox IMAGEN SIN ZOOM
         #Se encontró que el área  de los círculos grandes es mayor a 1200 unidades aprox IMAGEN SIN ZOOM
-        #cuadradas, daremos un margen de error.
+        #cuadradas, daremos un margen de error. El limite de 2500 se puso porque en magenta encontraba
+        #un contorno no deseado
         #if area>=4000: #para imagen con zoom
-        if area>=850:
+        if area>=850 and area<2500:
             cntsd.append(cnt)
     return cntsd
 def centros_contornos(cnts, areas):
@@ -101,7 +102,7 @@ def centros_contornos(cnts, areas):
         cy = int(M['m01']/M['m00'])
         #verifica si el contorno es de un círculo pequeño o grande:
         #if areas[cont]<=6000: #CON ZOOM
-        if areas[cont]<=1200: #SIN ZOOM
+        if areas[cont]<=1600: #SIN ZOOM
             #osea círculo pequeño: se le dará un indicador 0
             circ=0
         else:
@@ -110,8 +111,34 @@ def centros_contornos(cnts, areas):
         centros.append((cx, cy, circ))
         cont+=1
     return centros
-def calcular_angulos(centros1,centros2,robot):
-    return True
+def calcular_angulos(x1,x2,y1,y2):
+    #solo inicialización del valor
+    cita=0
+    #calculo de cita respecto a la horizontal, tomando ángulos positivos en sentido horario
+    """if x2==x1 or y2==y1:
+        print("coordenadas iguales identificadas x, y; x2, y2", x1, y1, x2, y2)"""
+    #desplazamiento vertical (da problema por ser división entre 0 en la definición de cita):
+    if x2==x1:
+        #subió el robot, entonces el angulo es 270 grados
+        print("coordenadas iguales identificadas x, y; x2, y2", x1, y1, x2, y2)
+        if y1>y2:
+            cita=1.5*math.pi
+        else:
+            #bajó el robot, el ángulo es 90 grados
+            print("entró")
+            cita=0.5*math.pi
+    if x2<x1: #segundo y tercer cuadrante
+        cita=np.arctan((y2-y1)/(x2-x1))
+        cita=cita+(math.pi)
+    if x2>x1:
+        if y2<y1: #cuarto cuadrante
+            cita=np.arctan((y2-y1)/(x2-x1))
+            cita=cita+2*(math.pi)
+        else: #caso de primer cuadrante
+            cita=np.arctan((y2-y1)/(x2-x1))
+    else: #caso de primer cuadrante
+        cita=np.arctan((y2-y1)/(x2-x1))  
+    return cita
 
 def desplazamiento(centerIm1,centerIm2, centros, robot, imagen):
     #centerIm1 e Im2 son las posiciones den las listas de centros
@@ -125,20 +152,33 @@ def desplazamiento(centerIm1,centerIm2, centros, robot, imagen):
     y2=centros[imagen+1][centerIm2][1]
     #print("x1,x2,y1,y2", x1, x2, y1,y2)
     distance = math.sqrt( ((x1-x2)**2)+((y1-y2)**2) )
+    #se calcula el angulo según lo mostrado en la imagen "interpretacion angulos"
+    #al menos un desplazamiento de 3.33mm #se puede cambiar a conveniencia
+    if distance>(3*mmPixel):
+        angulo=calcular_angulos(x1,x2,y1,y2)
+    else:
+        #si no se movió practicamente asuma ángulo 0 también
+        angulo=0
     #pasa distancias a mm CON ZOOM
     #distancemm=mmPixelZ*distance
     #pasa distancias a mm SIN ZOOM
     distancemm=mmPixel*distance
     #retorna el número de imagen, el robot y cuánto se movió
-    out=(imagen, robot, distancemm)
+    out=(imagen, robot, distancemm, angulo)
     desplazamientos.append(out)
     return desplazamientos
 
 def calcular_desplazamiento(centrosC,centrosM,centrosA,centrosN,numImagenes):
+    #resolución espacial para imagen con zoom [mm/pixel]
+    mmPixelZ=40/54
+    #resolución espacial para imagen sin zoom [mm/pixel]
+    mmPixel=40/36
     #crea la lista donde se almacenarán los desplazamientos entre 2 imágenes del
     #mismo identificador.
     #n contiene el número de imágenes
     desplazamientos=[]
+    #contiene las posiciones iniciales de los robots
+    posIniciales=[]
     #lista de números de robots
     Robots=[]
     
@@ -157,8 +197,10 @@ def calcular_desplazamiento(centrosC,centrosM,centrosA,centrosN,numImagenes):
         #se asume el robot NO desaparece de la escena
         #k es el número de imagen
         #for k in range (numImagenes-1):
+        #print("numero de imágenes que tienen peers", len(CMpeers))
         for k in range (len(CMpeers)-1):
             #pareja es el número de pareja en la k-ésima imagen
+            #print("numero de peers en una imagen", len(CMpeers[k+1]))
             for pareja in range(len(CMpeers[k])):
                 #la última posición que es 2 indica que extrae el centro del círculo grande
                 centerIm1=CMpeers[k][pareja][2]
@@ -171,6 +213,17 @@ def calcular_desplazamiento(centrosC,centrosM,centrosA,centrosN,numImagenes):
                 #movimiento devuelve el #imagen, el robot y cuánto se desplazó
                 movimiento=desplazamiento(centerIm1,centerIm2, centrosC, robot, k)
                 desplazamientos.append(movimiento)
+                #si es la primera imagen
+                #print("num imagen ", movimiento[0][0])
+                if movimiento[0][0]==0:
+                    #print("entró")
+                    #retorna identificador 99 que significa inicial, #robot, coordenada x, coordenada y
+                    x=centrosC[0][centerIm1][0]*mmPixel
+                    y=centrosC[0][centerIm1][1]*mmPixel
+                    inicial=(99, movimiento[0][1],x, y)
+                    #se agrega la posicion inicial a la lista
+                    posIniciales.append(inicial)
+                
     """
     CNpeers=buscar_peer(1, 3, centrosC,centrosN)
     CApeers=buscar_peer(1, 4, centrosC,centrosA)
@@ -192,6 +245,7 @@ def calcular_desplazamiento(centrosC,centrosM,centrosA,centrosN,numImagenes):
         #k es el número de imagen
         for k in range (numImagenes-1):
             #pareja es el número de pareja en la k-ésima imagen
+            #print("numero de peers CA en una imagen", len(CApeers[k]))
             for pareja in range(len(CApeers[k])):
                 #la última posición que es 2 indica que extrae el centro del círculo grande
                 centerIm1=CApeers[k][pareja][2]
@@ -204,18 +258,66 @@ def calcular_desplazamiento(centrosC,centrosM,centrosA,centrosN,numImagenes):
                 #movimiento devuelve el #imagen, el robot y cuánto se desplazó
                 movimiento=desplazamiento(centerIm1,centerIm2, centrosC, robot, k)
                 desplazamientos.append(movimiento)
+                #posiciones iniciales
+                if movimiento[0][0]==0:
+                    #print("entró")
+                    #retorna #robot, coordenada x, coordenada y
+                    x=centrosC[0][centerIm1][0]*mmPixel
+                    y=centrosC[0][centerIm1][1]*mmPixel
+                    inicial=(99, movimiento[0][1],x, y)
+                    #se agrega la posicion inicial a la lista
+                    posIniciales.append(inicial)
 
-    return desplazamientos
+    #Para Amarillo con Magenta
+    if len(AMpeers)!=0:
+        #print("AMpeers imagen 1",AMpeers[0])
+        #se asume el robot NO desaparece de la escena
+        #k es el número de imagen
+        for k in range (numImagenes-1):
+            #pareja es el número de pareja en la k-ésima imagen
+            #print("numero de peers AM en una imagen", len(AMpeers[k]))
+            for pareja in range(len(AMpeers[k])):
+                #la última posición que es 2 indica que extrae el centro del círculo grande
+                centerIm1=AMpeers[k][pareja][2]
+                #extrae el centro grande de la pareja pero en la imagen siguiente
+                centerIm2=AMpeers[k+1][pareja][2]
+                #la posición 1 indica el número de robot al que corresponde la pareja
+                robot= AMpeers[k][pareja][1]
+                """#la posición 0 indica el número de imagen
+                imagen= AMpeers[k][pareja][0]"""
+                #movimiento devuelve el #imagen, el robot y cuánto se desplazó
+                movimiento=desplazamiento(centerIm1,centerIm2, centrosC, robot, k)
+                desplazamientos.append(movimiento)
+                #posiciones iniciales
+                if movimiento[0][0]==0:
+                    #print("entró")
+                    #retorna #robot, coordenada x, coordenada y
+                    x=centrosA[0][centerIm1][0]*mmPixel
+                    y=centrosA[0][centerIm1][1]*mmPixel
+                    inicial=(99, movimiento[0][1],x, y)
+                    #se agrega la posicion inicial a la lista
+                    posIniciales.append(inicial)
 
-def escribir_txt(nombretxt,desplazamientos):
+    return desplazamientos, posIniciales
+
+def escribir_txt(nombretxt,desplazamientos, posIniciales):
     with open(nombretxt, 'w') as output:
+        output.write("99 = es una posición inicial; robot; coordenada x en mm; coordenada y en mm; ángulo respecto a la horizontal"+ '\n')
+        for pos in posIniciales:
+            identificador=pos[0]
+            robot=pos[1]
+            x=pos[2]
+            y=pos[3]
+            #no se ocupa angulo porque se tiene la posicion inicial
+            output.write(str(identificador) + ";"+str(robot)+ ";"+ str(x)+";"+  str(y)+ '\n')
         output.write("Desplazamientos: #imagen; robot; desplazamiento; ángulo"+ '\n')
         for d in desplazamientos:
-            print("desplazamiento d: ", d)
+            #print("desplazamiento d: ", d)
             imagen=d[0][0]
             robot=d[0][1]
             desplazamiento=d[0][2]
-            output.write(str(imagen) + ";"+str(robot)+ ";"+ str(desplazamiento)+";"+ "ángulo"+ '\n')
+            angulo=d[0][3]
+            output.write(str(imagen) + ";"+str(robot)+ ";"+ str(desplazamiento)+";"+ str(angulo)+ '\n')
         print("Archivo creado")
 def buscar_peer(numColor1, numColor2, centrosC1,centrosC2):
     #la lista de peers contendrá los colores que son pareja (su identificador), y la posición
@@ -247,7 +349,10 @@ def buscar_peer(numColor1, numColor2, centrosC1,centrosC2):
                 #para encontrar un contorno de círculo pequeño. Además, la distancia aproximada entre centros
                 #de círculos grande y pequeño es de 30 (comprobado por paint y este cálculo). Se agregará un pequeño margen de 5 píxeles
                 #Esta función solo agrega al peer si la distancia se cumple y el primero es el más grande, así
-                #se evita la duplicidad de peers
+                #se evita la duplicidad de peers.
+                #se cambió de 35 a 40
+                """if numColor1==1 and numColor2==4 and imagen==4:
+                    print("distancia y tipo de circulo: ", distance, "----", centrosC2[imagen][centro2][2])"""
                 if (distance<=35) and (centrosC2[imagen][centro2][2]==0):
                     #guarda el número de imagen en cuestión, los colores que hicieron match,
                     #las posiciones dentro de los centros de cada color que hicieron match.
@@ -263,16 +368,7 @@ def buscar_peer(numColor1, numColor2, centrosC1,centrosC2):
     #cada elemento es una lista de parejas encontradas para los 2 colores solicitados
     return peers
 
-        
-def identificar_robots(Acyan, Amagenta, Aamarillo, Anaranja, centros_cCyan, centros_cMagenta, centros_cNaranja, centros_cAmarillo):
-    #recibe las listas de áreas de los contornos depurados y ordenados.
-    #cada lista en la posición [i] tiene la lista de áreas de los contornos de una imagen
-    #cada lista en la posición [i][j] tiene una área de un contorno, entre mayor j mayor tamaño de contorno.
-    #Se asume que la cantidad de robots no cambia en las imágenes, por eso índice [0] -EN REVISIÓN-
-    #primera dimensión es la cantidad de imágenes, y la segunda es la cantidad de contornos de ese color
-    #140 píxeles mide de diámetro aproximadamente un círculo grande: Imagen con ZOOM
-                  
-    return True
+
 #calculo de angulo entre rectas
 #https://byjus.com/maths/angle-between-two-lines/
 
@@ -367,10 +463,11 @@ for i in imgList:
 
 #--------------------- Definición de rangos de color HSV---------------------------
 #Rangos cyan:
-light_cyan = (95, 175, 185)
+#light_cyan = (95, 175, 185)
+light_cyan = (95, 175, 175)
 dark_cyan = (105, 255, 250)
 #Rangos magenta:
-light_magenta = (160, 100, 0)
+light_magenta = (160, 100, 50)
 dark_magenta = (170, 255, 255)
 #Rangos verde:
 light_verde = (45, 20, 0)
@@ -379,7 +476,8 @@ dark_verde = (80, 100, 255)
 light_rojo = (168, 50, 0)
 dark_rojo = (180, 255, 255)
 #Rangos azul: 
-light_azul = (100, 125, 10)
+#light_azul = (100, 125, 10)
+light_azul = (100, 200, 100)
 dark_azul = (120, 255, 255)
 #Rangos naranja: 
 light_nar = (12, 100, 200)
@@ -454,7 +552,7 @@ for j in range(len(imagenes)):
     resultAll = cv2.bitwise_and(imagenes[j], imagenes[j], mask=maskAll)
     
     #Muestra los resultados de filtrado por color para una imagen
-    
+    """
     if ind==0:
         # se crea la figura
         fig = plt.figure(figsize=(8, 8))
@@ -503,7 +601,7 @@ for j in range(len(imagenes)):
         plt.axis('off')
         plt.title("Todos")
         plt.show()
-        #"""
+        """
     ind+=1
     
     #se inicializa la variable de tamaño de contorno
@@ -559,13 +657,12 @@ for j in range(len(imagenes)):
     areasAmarillo=get_contour_areas(cntsAmarillos)
     areasNaranja=get_contour_areas(cntsNaranjas)
 
-    print("Áreas encontradas Amarillo", areasAmarillo)
-    print("Áreas encontradas Cyan", areasCyan)
+    #print("Áreas encontradas Amarillo", areasAmarillo)
+    #print("Áreas encontradas Cyan", areasCyan)
+    #print("Áreas encontradas Magenta", areasMagenta)
     """
     print("Áreas Cyan depuradas y ordenadas", areasMagenta)
-    
     print("Áreas encontradas Naranja", areasNaranja)
-    print("Áreas encontradas Magenta", areasMagenta)
     """
 
     #Dibuja los contornos encontrados correspondientes
@@ -580,7 +677,7 @@ for j in range(len(imagenes)):
     contornosMagenta = cv2.drawContours(RespaldoImagenes[j], cntsMagentas, -1, (155,0,255), 5)
 
     #Muestra los resultados parciales de la primera imagen2
-    if j==0:
+    if j==4:
         """
         #Para mostrar subplots
         # se crea la figura
@@ -610,9 +707,9 @@ for j in range(len(imagenes)):
         plt.axis('off')
         plt.title("Contornos Amarillo")
         plt.show()
-        """
+        
         #Mostrando los contornos dibujados
-        """
+        
         fig = plt.figure(figsize=(8, 8))
         rows = 1
         columns = 1
@@ -622,6 +719,7 @@ for j in range(len(imagenes)):
         plt.title("Contornos encontrados")
         plt.show()
         """
+        
     #Cálculo de los centroides de los contornos
     centrosCyan=centros_contornos(cntsCyans, areasCyan)
     centrosMagenta=centros_contornos(cntsMagentas, areasMagenta)
@@ -650,7 +748,7 @@ dNaranja=calcular_desplazamiento(centros_cCyan, centros_cMagenta, centros_cAmari
 """
 
 #Cálculo de desplazamientos: de momento solo Cyan se implementó en la función
-desplazamientosX=calcular_desplazamiento(centros_cCyan, centros_cMagenta, centros_cAmarillo, centros_cNaranja,n)
+desplazamientosX, posIniciales=calcular_desplazamiento(centros_cCyan, centros_cMagenta, centros_cAmarillo, centros_cNaranja,n)
 
 #Buscar parejas de cada círculo
 #Cada color se identifica con un número: cyan (1), magenta (2), naranja (3), amarillo (4)
@@ -661,6 +759,7 @@ desplazamientosX=calcular_desplazamiento(centros_cCyan, centros_cMagenta, centro
 #amarillo-magenta [5],  magenta-amarillo [6]
 #EN USOcyan-magenta [11], magenta-cyan [12]
 
+"""
 #buscaremos Cyan con Magenta:
 CMpeers=buscar_peer(1, 2, centros_cCyan,centros_cMagenta)
 #mostraremos los peers encontrados para la primera imagen:
@@ -677,12 +776,21 @@ print("Peers imagen 1 Magenta-Amarillo", MApeers[0])
 ANpeers=buscar_peer(4, 3, centros_cAmarillo,centros_cNaranja)
 #mostraremos los peers encontrados para la primera imagen:
 print("Peers imagen 1 Amarillo-Naranja", ANpeers[0])
-
+"""
 #Crea archivo txt con los desplazamientos
 #Nombre del txt:
-nombretxt="Desplazamientos.txt"
-escribir_txt(nombretxt,desplazamientosX)
+#nombretxt="Desplazamientos.txt" #REBECA
+nombretxt="Tram_CV_140621.txt"
+escribir_txt(nombretxt,desplazamientosX, posIniciales)
 
+"""
+#calcular_angulos(x1, x2, y1, y2)
+cita1=calcular_angulos(0,5,0,5)
+cita2=calcular_angulos(0,5,5,0)
+cita3=calcular_angulos(5,0,5,0)
+cita4=calcular_angulos(5,0,0,5)
+#debería retornar pi/4, 5.5, 3.93, 2.36
+print("Angulos calculados prueba: ", cita1, cita2, cita3, cita4)"""
 
 
 
