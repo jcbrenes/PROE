@@ -150,7 +150,7 @@ void revisarSharp(){ //Revisa el valor del sensor Sharp
     lectura=analogRead(sharp);
     filtrado=filtrado-(beta*(filtrado-lectura)); //Filtro de media movil
     distancia=1274160*pow(filtrado,-1.174); //Regresión lineal de datos experimentales para obtener distancia en milimetros
-    if ((distancia<distanciaMinimaSharp) & (angulo!=anguloAnterior)){ //revisa distancia umbral y que solo se haga un envío por cada ángulo
+    if ((distancia<distanciaMinimaSharp) && (angulo!=anguloAnterior)){ //revisa distancia umbral y que solo se haga un envío por cada ángulo
       crearMensaje(1,int(distancia),angulo); //Enviar obstaculo tipo 1 con distancia en cm y angulo
     }
     anguloAnterior=angulo;
