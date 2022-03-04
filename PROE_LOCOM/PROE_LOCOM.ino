@@ -546,7 +546,8 @@ void RecorrerObstaculos(){
       }
     }
       
-    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]);
+    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
+    //CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], datosSensores[ultimoObstaculo][3], datosSensores[ultimoObstaculo][4], datosSensores[ultimoObstaculo][5]); //Enviar solo ultimo obstaculo para debugging
    }
 }
 
