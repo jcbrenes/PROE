@@ -1,3 +1,4 @@
+//Código de calibración de MPU y magnetometro para ATTABOT PROE
 //Código de calibracion del magnetometro de los robots del proyecto PROE basado en el paper: https://ieeexplore.ieee.org/abstract/document/4209540
 //Usado en una placa Feather M0 RFM95 y magnetometro tipo _________
 //https://github.com/jcbrenes/PROE
@@ -5,12 +6,18 @@
 #include <Wire.h>
 #include<math.h>
 #include "wiring_private.h" // pinPeripheral() function
- 
+
 TwoWire myWire(&sercom1, 11, 13);
 
 #define addr 0x0D //I2C Address for The HMC5883
 #define PI 3.1415926535897932384626433832795 //Constante Pi
 #define dirEEPROM B01010000 //Direccion de la memoria EEPROM
+
+//Radios de conversión según data sheet del MPU6050
+#define A_R 16384.0
+#define G_R 131.0
+
+float gx_off,gy_off,gz_off,acx_off,acy_off,acz_off;
 
 //constantes del robot empleado
 const int tiempoMuestreo = 10000; //unidades: micro segundos
@@ -120,6 +127,9 @@ float preAng,angulo; //Angulo de rotación de los datos
 double factorEsc; //Factor de escalamiento para lograr un círculo
 float xft,yft; //Valores filtrados
 
+bool cal_mag=0;
+bool cal_mpu=0;
+
 void setup() {
   //asignación de pines
   pinMode(PWMA, OUTPUT);
@@ -142,86 +152,183 @@ void setup() {
   pinPeripheral(11, PIO_SERCOM);
   pinPeripheral(13, PIO_SERCOM);
   inicializaMagnet();
+  Serial.begin(115200);
   delay(3000);
 }
 
-void loop() {
+
+
+void loop(){
+  if (!cal_mpu){
+    Calibracion_MPU();
+  }
+
+  if (!cal_mag){
+    Calibracion_Mag(); 
+  }
+ 
+}
+
+void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro de 360°, asegurarse que no tenga perturbaciones magneticas cerca en tiempo de calibración
+  Serial.println("Calibrando Magnetometro");
   short x2,y2,z2;
   float x1,y1,d;
   medirMagnet(x2,y2,z2);
   //Toma las muestras con la función Giro() sobre una circunferencia completa
-  if(Giro(360)==false){
-    if (i==0){ //La variable i definirá la cantidad de datos que se tomen
-        rawx[i]=float(x2);
-        rawy[i]=float(y2);
-        i++;
-      }
-      //Algoritmo que funciona durante la toma de datos para eliminar datos redundantes para no exceder la RAM del feather
-      else{
-        x1=rawx[i-1];
-        y1=rawy[i-1];
-        d=sqrt(pow(abs(x2-x1),2)+pow(abs(y2-y1),2)); //Distancia euclideana entre 2 pares de puntos
-        if (d>=1.0){
+  while (!cal_mag){
+    if(Giro(360)==false){
+      if (i==0){ //La variable i definirá la cantidad de datos que se tomen
           rawx[i]=float(x2);
           rawy[i]=float(y2);
           i++;
         }
+        //Algoritmo que funciona durante la toma de datos para eliminar datos redundantes para no exceder la RAM del feather
+        else{
+          x1=rawx[i-1];
+          y1=rawy[i-1];
+          d=sqrt(pow(abs(x2-x1),2)+pow(abs(y2-y1),2)); //Distancia euclideana entre 2 pares de puntos
+          if (d>=1.0){
+            rawx[i]=float(x2);
+            rawy[i]=float(y2);
+            i++;
+          }
+        }
       }
-    }
-    //Etapa de filtrado, se utiliza el filtro de "Media movil"
-   else{
-     Serial.println("Procesando datos...");
-     delay(300); 
-     //Filtrado de datos
-     for (int s=0;s<=i;s++){
-      float crudox=rawx[s];
-      float crudoy=rawy[s];
-      xft=crudox*alfa+(1-alfa)*xft;
-      yft=crudoy*alfa+(1-alfa)*yft;
-      if (s>=desfase){ //El desfase se implementa para eliminar datos iniciales basura
-        rawx[s-desfase]=xft;
-        rawy[s-desfase]=yft; 
+      //Etapa de filtrado, se utiliza el filtro de "Media movil"
+     else{
+       Serial.println("Procesando datos...");
+       delay(300); 
+       //Filtrado de datos
+       for (int s=0;s<=i;s++){
+        float crudox=rawx[s];
+        float crudoy=rawy[s];
+        xft=crudox*alfa+(1-alfa)*xft;
+        yft=crudoy*alfa+(1-alfa)*yft;
+        if (s>=desfase){ //El desfase se implementa para eliminar datos iniciales basura
+          rawx[s-desfase]=xft;
+          rawy[s-desfase]=yft; 
+        }
       }
-    }
-    //Calcula los maximos y mínimos
-    maxX=maxF(rawx);
-    minX=minF(rawx);
-    maxY=maxF(rawy);
-    minY=minF(rawy);
-    //Calcula los offset del elipsoide y los sustrae
-    xoff=(maxX+minX)/2;
-    yoff=(maxY+minY)/2;
-    for (int p=0;p<=i;p++){
-        rawx[p]=rawx[p]-xoff;
-        rawy[p]=rawy[p]-yoff;
-    }
-    //Determina los segundos momentos de inercia
-    for (int h=0;h<=i;h++){
-        sumXX=pow(rawx[h],2)+sumXX;
-        sumYY=pow(rawy[h],2)+sumYY;
-        sumXY=rawx[h]*rawy[h]+sumXY;
-    }
-    uXX=sumXX/i;
-    uYY=sumYY/i;
-    uXY=sumXY/i;
-    //Calcula el angulo
-    angulo=0.5*atan2((2*uXY),(uXX-uYY));
-    //Escalado
-    if ((maxX-minX)>(maxY-minY)){
-      factorEsc=(maxX-minX)/(maxY-minY);
-    }
-    else{
-      factorEsc=-1*(maxY-minY)/(maxX-minX);
+      //Calcula los maximos y mínimos
+      maxX=maxF(rawx);
+      minX=minF(rawx);
+      maxY=maxF(rawy);
+      minY=minF(rawy);
+      //Calcula los offset del elipsoide y los sustrae
+      xoff=(maxX+minX)/2;
+      yoff=(maxY+minY)/2;
+      for (int p=0;p<=i;p++){
+          rawx[p]=rawx[p]-xoff;
+          rawy[p]=rawy[p]-yoff;
+      }
+      //Determina los segundos momentos de inercia
+      for (int h=0;h<=i;h++){
+          sumXX=pow(rawx[h],2)+sumXX;
+          sumYY=pow(rawy[h],2)+sumYY;
+          sumXY=rawx[h]*rawy[h]+sumXY;
+      }
+      uXX=sumXX/i;
+      uYY=sumYY/i;
+      uXY=sumXY/i;
+      //Calcula el angulo
+      angulo=0.5*atan2((2*uXY),(uXX-uYY));
+      //Escalado
+      if ((maxX-minX)>(maxY-minY)){
+        factorEsc=(maxX-minX)/(maxY-minY);
+      }
+      else{
+        factorEsc=-1*(maxY-minY)/(maxX-minX);
+      } 
+     //Guarda valores en la memoria EEPROM
+     guardarDatoFloat(xoff,0);
+     guardarDatoFloat(yoff,4);
+     guardarDatoFloat(angulo,8);
+     guardarDatoFloat(factorEsc,12); 
+     cal_mag=true;
+     Serial.println("Magnetometro calibrado");
     } 
-   //Guarda valores en la memoria EEPROM
-   guardarDatoFloat(xoff,0);
-   guardarDatoFloat(yoff,4);
-   guardarDatoFloat(angulo,8);
-   guardarDatoFloat(factorEsc,12);
-   Serial.println("Magnetometro calibrado");
-   exit(0); 
-  } 
+  }
 }
+
+void Calibracion_MPU(){  //Funcion que mide datos del MPU en posición horizontal y sin movimiento para calibracion y guarda la calibración en EEPROM
+  Serial.println("Calibrando MPU");
+  for(int j=0;j<=2;j++){
+    float gx_prom=0;
+    float gy_prom=0;
+    float gz_prom=0;
+    float acx_prom=0;
+    float acy_prom=0;
+    float acz_prom=0;
+    for (int i=0;i<=100;i++){
+      float gxx,gyy,gzz,axx,ayy,azz;
+      leeMPU(gxx, gyy, gzz, axx, ayy, azz);
+      acx_prom=acx_prom+axx;
+      acy_prom=acy_prom+ayy;
+      acz_prom=acz_prom+azz;
+      gx_prom=gx_prom+gxx;
+      gy_prom=gy_prom+gyy;
+      gz_prom=gz_prom+gzz;
+    }
+   gx_off=gx_off+(gx_prom/100);
+   gy_off=gy_off+(gy_prom/100);
+   gz_off=gz_off+(gz_prom/100);
+   acx_off=acx_off+(acx_prom/100);
+   acy_off=acy_off+(acy_prom/100);
+   acz_off=acz_off+(16384-(acz_prom/100));
+  }
+  //Guarda los datos en la EEPROM
+  guardarDatoFloat(gx_off,16);
+  guardarDatoFloat(gy_off,20);
+  guardarDatoFloat(gz_off,24);
+  guardarDatoFloat(acx_off,28);
+  guardarDatoFloat(acy_off,32);
+  guardarDatoFloat(acz_off,36);
+  Serial.println("MPU calibrada");
+  cal_mpu=true;
+}
+
+
+
+
+
+
+void inicializarMPU(){
+  myWire.beginTransmission(0x68); //empezar comunicacion con el mpu6050
+  myWire.write(0x6B);   //escribir en la direccion 0x6B
+  myWire.write(0x00);   //escribe 0 en la direccion 0x6B (arranca el sensor)
+  myWire.endTransmission();   //termina escritura
+  }
+
+//Funcione que extrae los datos crudos del MPU
+void leeMPU(float &gx,float &gy,float &gz,float &ax,float &ay,float &az){
+  
+  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //datos crudos
+  
+  myWire.beginTransmission(0x68);   //empieza a comunicar con el mpu6050
+  myWire.write(0x3B);   //envia byte 0x43 al sensor para indicar startregister
+  myWire.endTransmission();   //termina comunicacion
+  myWire.requestFrom(0x68,14); //pide 6 bytes al sensor, empezando del reg 43 (ahi estan los valores del giro)
+
+  ac_x = myWire.read()<<8 | myWire.read();
+  ac_y = myWire.read()<<8 | myWire.read();
+  ac_z = myWire.read()<<8 | myWire.read();
+
+  tmp = myWire.read()<<8 | myWire.read();
+
+  gyro_x = myWire.read()<<8 | myWire.read(); //combina los valores del registro 44 y 43, desplaza lo del 43 al principio
+  gyro_y = myWire.read()<<8 | myWire.read();
+  gyro_z = myWire.read()<<8 | myWire.read();
+
+  gx=float(gyro_x)-gx_off;
+  gy=float(gyro_y)-gy_off;
+  gz=float(gyro_z)-gz_off;
+
+  ax=float(ac_x)-acx_off;
+  ay=float(ac_y)-acy_off;
+  az=float(ac_z)+acz_off;
+}
+
+
 
 bool Giro(float grados) {
 
@@ -615,6 +722,9 @@ float minF(float arrayData[]){
   return minV; 
 }
 
+
+
+
 void guardarDatoFloat(float dato,int dirPagInicial){
     byte varr1; //primeros 8 bits para guardar en la EEPROM (LSB)
     byte varr2; //ultimo 8 bits para guardar en la EEPROM (MSB)
@@ -670,6 +780,7 @@ float constrVar(byte LSB, byte MSB, byte dec){
     nuevo=nuevo+decs/100;
     return nuevo;
   }
+  
 void transfVar(float num,byte &var1,byte &var2,byte &varDec){
     int nuevoNum=int(num);
     int desplazamiento;
