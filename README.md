@@ -40,3 +40,4 @@ Investigadores:
 Asistentes:
 - Bryan Alpízar Quesada bryan2300@gmail.com
 - Andrés Jiménez Mora andjm1428@gmail.com
+- David Gómez Carrasquilla davidjgomezc@gmail.com
