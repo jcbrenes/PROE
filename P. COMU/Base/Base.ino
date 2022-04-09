@@ -64,7 +64,7 @@ void setup()
   serialPrintln("Prueba base");
   serialPrintln();
 
-  // manual reset
+  // manual reset prueba
   digitalWrite(RFM69_RST, HIGH);
   delay(10);
   digitalWrite(RFM69_RST, LOW);
