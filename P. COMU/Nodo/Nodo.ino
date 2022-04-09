@@ -16,7 +16,7 @@
 #define serialPrintln(x)
 #endif
 
-// Prueba
+
 //**** Variables para las pruebas en el laboratorio ****//
 uint8_t cantidadRobots; // Cantidad de robots en el enjambre 
 int unidadAvance; // Unidad en mm que avance cada robots del enjambre
