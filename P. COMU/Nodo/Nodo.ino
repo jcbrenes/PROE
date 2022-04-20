@@ -118,26 +118,19 @@ void setup()
 
   serialPrint("RFM69 radio @");  serialPrint((int)RF69_FREQ);  serialPrintln(" MHz");
   
+  serialPrintln("Esperando unidad de avance...");
   unidadAvance = waitUnidadAvance(&dataRecieved);
-  serialPrint("Unidad de avance: "); Serial.println(unidadAvance, 10);
+  serialPrint("Unidad de avance: "); serialPrintln(unidadAvance);
   dataRecieved = false;
 
+  serialPrintln("Esperando cantidad de robots...");
   cantidadRobots = waitCantidadRobots(&dataRecieved);
-  serialPrint("Cantidad de robots recibido: "); Serial.println(cantidadRobots, 10);
+  serialPrint("Cantidad de robots recibido: "); serialPrintln(cantidadRobots);
   dataRecieved = false;
 }
 
 void loop() {
     sincronizacion();
-}
-
-void Blink(byte PIN, int DELAY_MS, byte loops) {
-  for (byte i=0; i<loops; i++)  {
-    digitalWrite(PIN,HIGH);
-    delay(DELAY_MS);
-    digitalWrite(PIN,LOW);
-    delay(DELAY_MS);
-  }
 }
 
 /**** RTC FUNCIONES ****/
@@ -190,7 +183,7 @@ void RTC_Handler(void) {
     while (RTCisSyncing());                     //Llamo a función de escritura.
 
     timeStamp1 = RTC->MODE0.COUNT.reg;
-    Serial.println(timeStamp1, 10);
+    serialPrintln(timeStamp1);
     
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }
@@ -212,7 +205,7 @@ void sincronizacion() {
         
         while (RTCisSyncing());                                                   //Espero la sincronización
         timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
-        Serial.print("¡Reloj del máster clock recibido!");
+        serialPrintln("¡Reloj del máster clock recibido!");
       }
     }
   }

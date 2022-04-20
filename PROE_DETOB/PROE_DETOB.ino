@@ -1,18 +1,20 @@
-//Código de detección de obstáculos para el proyecto PROE
-//Usado en la placa Bluepill STM32
-//https://github.com/jcbrenes/PROE
-/*
-Se encarga de la lectura de sensores y comunica cualquier evento mediante i2c al feather al que está conectado despues de notificarle mediante un pin adicional de interurpcion
-Se usa el formato "x,y,z." donde "x" es el código del evento, "y" es el valor de lectura si aplica y "z" el angulo en caso del sensor Sharp.
-Códigos de evento:
-  1)Sensor Sharp
-  2)IR frontal
-  3)IR derecho
-  4)IR izquierdo
-  5)Temperatura
-  6)Batería baja
-Adicionalmente tiene tres salidas conectadas a leds para notificación y un switch extra
-*/
+/** \file PROE_DETOB.ino
+ * \author PROE
+ * \link https://github.com/jcbrenes/PROE \endlink
+ * \brief Código de detección de obstáculos
+ * Usado en la placa Bluepill STM32
+ *
+ * Se encarga de la lectura de sensores y comunica cualquier evento mediante i2c al feather al que está conectado despues de notificarle mediante un pin adicional de interurpcion
+ * Se usa el formato "x,y,z." donde "x" es el código del evento, "y" es el valor de lectura si aplica y "z" el angulo en caso del sensor Sharp.
+ * Códigos de evento:
+ *   1)Sensor Sharp
+ *   2)IR frontal
+ *   3)IR derecho
+ *   4)IR izquierdo
+ *   5)Temperatura
+ *   6)Batería baja
+ * Adicionalmente tiene tres salidas conectadas a leds para notificación y un switch extra
+ */
 
 #include <Servo.h>
 #include <Wire_slave.h>   //para usar el STM32 como secundario en el puerto I2C                   
