@@ -1,5 +1,10 @@
-//Código de feather base que recibe datos de los robots en el campo y los envia por usb al puerto serial en el formato predefinido
-
+/** \file PROE_COMBASE.ino
+ * \author PROE
+ * \link https://github.com/jcbrenes/PROE \endlink
+ * \brief Código de feather base
+ * Código de feather base que recibe datos de los robots en el campo y los 
+ * envia por usb al puerto serial en el formato predefinido
+*/
 
 #include <SPI.h>
 #include <RH_RF69.h>

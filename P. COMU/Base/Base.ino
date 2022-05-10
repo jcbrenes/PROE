@@ -122,28 +122,8 @@ void loop() {
   // Código
 }
 
-/// \fn void Blink(byte PIN, byte DELAY_MS, byte loops)
-/// \param PIN Salida del PIN a parpadear
-/// \param DELAY_MS Tiempo para intercambiar el valor de salida
-/// \param loops Cuantas veces se quiere intercalar la operación
-/// \brief Realiza un parpadeo en una salida con un ciclo de trabajo del 50%
-void Blink(byte PIN, byte DELAY_MS, byte loops) {
-  for (byte i=0; i<loops; i++)  {
-    digitalWrite(PIN,HIGH);
-    delay(DELAY_MS);
-    digitalWrite(PIN,LOW);
-    delay(DELAY_MS);
-  }
-}
-
-void sendBroadcast(char message[RH_RF69_MAX_MESSAGE_LEN]){
-  serialPrint("Sending: "); Serial.println(message);
-  rf69_manager.sendto((uint8_t *)message, strlen(message), 255);
-}
-
 /**** RTC FUNCIONES****/
 
-/// \fn sendCantidadRobots(int *cantRobots)
 /// \param cantRobots Puntero hacía la variable con la cantidad de robots en el enjambre
 /// \return Devuelve true si se envía el mensaje y false en caso contrario
 bool sendCantidadRobots(int *cantRobots){
@@ -155,7 +135,6 @@ bool sendCantidadRobots(int *cantRobots){
   return rf69_manager.sendto(dataCantRobots, sizeof(dataCantRobots), RH_BROADCAST_ADDRESS);
 }
 
-/// \fn sendUnidadAvance(int Avance)
 /// \param Avance Unidad de avance para los robots
 /// \return Devuelve true si se envía el mensaje y false en caso contrario
 bool sendUnidadAvance(int *Avance){
@@ -167,7 +146,6 @@ bool sendUnidadAvance(int *Avance){
   return rf69_manager.sendto(dataUnidadAvance, sizeof(dataUnidadAvance), RH_BROADCAST_ADDRESS);
 }
 
-/// \fn bool sincronizar()
 /// \brief Envía el valor del clock en el registro para sincronizar los robots.
 /// \return Devuelve true si se envía el mensaje y false en caso contrario.
 bool sincronizar(){
@@ -181,9 +159,8 @@ bool sincronizar(){
   return rf69_manager.sendto(reloj, sizeof(reloj), RH_BROADCAST_ADDRESS);     //Enviar valor del RTC al esclavo
 }
 
-/// \fn inline bool RTCisSyncing()
 /// \brief Ver si SAMD21 está sincronizando los valores del registro
-/// \return Devuelve el bite de sincronización
+/// \return Devuelve el bit de sincronización
 inline bool RTCisSyncing() {
   //Función que lee el bit de sincronización de los registros
   return (RTC->MODE0.STATUS.bit.SYNCBUSY);

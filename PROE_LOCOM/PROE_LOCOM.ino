@@ -1,6 +1,10 @@
-//Código de locomoción y comunicacion para el proyecto PROE
-//Usado en la placa Feather M0 RFM95
-//https://github.com/jcbrenes/PROE
+/** \file PROE_LOCOM.ino
+ * \author PROE
+ * \link https://github.com/jcbrenes/PROE \endlink
+ * \brief Código de locomoción y comunicacion para el proyecto PROE
+ * Usado en la placa Feather M0 RFM95
+ * 
+ */ 
 
 #include<Wire.h> //Bilbioteca para la comunicacion I2C
 #include "wiring_private.h" // Necesario para el I2C secundario y usar pinPeripheral() function
@@ -204,8 +208,6 @@ bool cambio21=false;
 
 int c = 0; //Contador para led 13
 int b = 0;
-
-
 
 void setup() {
   //asignación de pines
@@ -1492,98 +1494,3 @@ void leeMPU(float &gir_ang_z, float &vely) {
   gir_ang_zPrev = gir_ang_z;
   vel_y_Prev = vely;
 }
-
-
-
-
-
-
-//*****Cementerio de funciones. Borrar en Junio 2021********
-
-
-//void RevisarSTM(){ 
-////Comunica al STM mediante pin de interrupcion que esta listo para recibir información de obstaculos 
-//  if((micros()-tiempoSTM)>=tiempoMuestreo/4){ //Atender obstaculos 4 veces por cada ciclo de la maquina de estados
-//    tiempoSTM=micros();
-//    if(estado!=RETROCEDA){ //Ignorar al STM si está retrocediendo
-//      digitalWrite(INT_OBSTACULO,HIGH);
-//      //delay(5);
-//      digitalWrite(INT_OBSTACULO,LOW);
-//      //delay(5);
-//    }
-//  }
-//}
-
-/*
-void ActualizarUbicacion() {
-  //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual
-  distanciaAvanzada = (int)calculaDistanciaLinealRecorrida();
-  if (poseActual[2] == 0 || abs(poseActual[2] == 360)) {
-    poseActual[1] = poseActual[1] + distanciaAvanzada;
-  }
-  else if (poseActual[2] == 90 || poseActual[2] == -270) {
-    poseActual[0] = poseActual[0] + distanciaAvanzada;
-  }
-  else if (poseActual[2] == -90 || poseActual[2] == 270) {
-    poseActual[0] = poseActual[0] - distanciaAvanzada;
-  }
-  else if (abs(poseActual[2]) == 180) {
-    poseActual[1] = poseActual[1] - distanciaAvanzada;
-  }
-  
-}
-*/
-
-//void RecibirI2C ()  {
-//  //Función (tipo Evento) llamada cuando se recibe algo en el puerto I2C conectado al STM32
-//  //Almacena en una matriz las variables de tipo de sensor, distancia y ángulo
-//  int cont = 1;
-//  int tipoSensor = 0;
-//  int distancia = 0;
-//  int angulo = 0;
-//  String acumulado = "";
-//  DeteccionObstaculo();
-//
-//  while (0 < Wire.available()) { // ciclo mientras se reciben todos los datos
-//    char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
-//    if (c == ',') { //los datos vienen separados por coma
-//      if (cont == 1) {
-//        tipoSensor = acumulado.toInt();
-//        acumulado = "";
-//      }
-//      if (cont == 2) {
-//        distancia = acumulado.toInt();
-//        acumulado = "";
-//      }
-//      cont++;
-//    } else if (c == '.') { //el ultimo dato viene con punto al final
-//      angulo = acumulado.toInt();
-//      acumulado = "";
-//      cont = 1;
-//    } else {
-//      acumulado += c;  //añade el caracter a la cadena anterior
-//    }
-//  }
-//
-//  float alphaObs = (float)(medirMagnet() + angulo);
-//  if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
-//    alphaObs = alphaObs - 360;          
-//  }
-//  else if(alphaObs < -180){
-//    alphaObs = alphaObs + 360;
-//  }
-//
-//  alphaObs = alphaObs - magInicioOrigen;
-//  if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
-//    alphaObs = alphaObs - 360;          
-//  }
-//  else if(alphaObs < -180){
-//    alphaObs = alphaObs + 360;
-//  }
-//
-//  CrearObstaculo(tipoSensor, distancia, alphaObs);
-//
-//  //obstaculoEnviado = false;
-//  //CrearMensaje(poseActual[0], poseActual[1], poseActual[2], tipoSensor, distancia, alphaObs);
-//  
-//}
