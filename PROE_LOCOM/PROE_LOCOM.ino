@@ -8,8 +8,8 @@
 #include <RH_RF69.h> //Biblioteca para la comunicacion por radio frecuencia
 
 //Variables del enjambre para la comunicación a la base
-uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 3; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
@@ -274,11 +274,6 @@ void setup() {
   }
 
   rf69.setTxPower(20, true); // Configura la potencia
-  uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-                  };
-
-  rf69.setEncryptionKey(key);
   rf69.setModeRx();
 
   /****Inicialización del RTC****/
@@ -315,7 +310,6 @@ void loop(){
   //Revisión de los encoders de los motores (tipo polling para no afectar la comunicación con Ints)
   //revisaEncoders(); 
   RecorrerObstaculos();
-
 
 
   //***MAQUINA DE ESTADOS*** Donde se manejan los comportamientos del robot y el control PID

@@ -54,11 +54,6 @@ void setup()
   rf69.setTxPower(20, true);   //Rango de 14-20 para la potencia, segundo argumento debe ser verdadero para el 69HCW.
   // Configurar aL NODO para que escuche cualquier dirección (esto sí es necesario).
 
-  // The encryption key has to be the same as the one in the server
-  uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-  rf69.setEncryptionKey(key);
-
   Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
 
   /***** Envío del clock *****/
