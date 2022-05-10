@@ -133,6 +133,68 @@ void loop() {
     sincronizacion();
 }
 
+/// \fn void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int distanciaX, int anguloX)
+/// \brief Crea el mensaje a ser enviado 
+/// \param poseX Posición X del robot
+/// \param poseY Posición Y del robot
+/// \param rotacion Ángulo del robot
+void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int distanciaX, int anguloX){ 
+//Crea el mensaje a ser enviado por comunicación RF. Es usado en la interrupcion del RTC
+  
+  if(timeReceived && !mensajeCreado){       //Aquí solo debe enviar mensajes, pero eso lo hace la interrupción, así que aquí se construyen mensajes y se espera a que la interrupción los envíe.
+
+    float frac = 0.867;                     //Fracción que se usa para insertarle a los random decimales. Se escogió al azar, el número no significa nada.
+
+    //Genero números al azar acorde a lo que el robot eventualmente podría enviar
+    float robotID = (float)idRobot;         //Esta variable se debe volver a definir, pues idRobot al ser global presenta problema al crear el mensaje.
+    float xP = (float)poseX;                //Posición X en que se detecto el obstaculo
+    float yP = (float)poseY;                //Posición Y en que se detecto el obstaculo
+    float phi = (float)rotacion;            //"Orientación" del robot
+    float tipo = (float)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
+    float rObs = (float)distanciaX;         //Distancia medida por el sharp si aplica
+    float alphaObs = (float)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
+
+    //Construyo mensaje (es una construcción bastante manual que podría mejorar)
+    ptrMensaje = (uint32_t*)&robotID;       //Utilizo el puntero para extraer la información del dato flotante.
+    for (uint8_t i = 0; i < 4; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << i * 8)) >> i * 8; //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
+    }
+
+    ptrMensaje = (uint32_t*)&xP;
+    for (uint8_t i = 4; i < 8; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 4) * 8)) >> (i - 4) * 8;
+    }
+
+    ptrMensaje = (uint32_t*)&yP;
+    for (uint8_t i = 8; i < 12; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 8) * 8)) >> (i - 8) * 8;
+    }
+
+    ptrMensaje = (uint32_t*)&phi;
+    for (uint8_t i = 12; i < 16; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 12) * 8)) >> (i - 12) * 8;
+    }
+
+    ptrMensaje = (uint32_t*)&tipo;
+    for (uint8_t i = 16; i < 20; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 16) * 8)) >> (i - 16) * 8;
+    }
+
+    ptrMensaje = (uint32_t*)&rObs;
+    for (uint8_t i = 20; i < 24; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 20) * 8)) >> (i - 20) * 8;
+    }
+
+    ptrMensaje = (uint32_t*)&alphaObs;
+    for (uint8_t i = 24; i < 28; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 24) * 8)) >> (i - 24) * 8;
+    }
+
+    //Una vez creado el mensaje, no vuelvo a crear otro hasta que la interrupción baje la bandera.
+    mensajeCreado = true;
+  }
+}
+
 /**** RTC FUNCIONES ****/
 
 inline bool RTCisSyncing() {
@@ -226,7 +288,7 @@ int waitUnidadAvance(bool *messageRecieved){
             }
         }
     }
-    return (int)data;    
+    return (int)data;
 }
 
 /// \fn int waitCantidadRobots()
