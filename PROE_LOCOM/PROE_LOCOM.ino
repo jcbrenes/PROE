@@ -1,19 +1,14 @@
-/** \file PROE_LOCOM.ino
- * \author PROE
- * \link https://github.com/jcbrenes/PROE \endlink
- * \brief Código de locomoción y comunicacion para el proyecto PROE
- * Usado en la placa Feather M0 RFM95
- * 
- */ 
+//Código de locomoción y comunicacion para el proyecto PROE
+//Usado en la placa Feather M0 RFM95
+//https://github.com/jcbrenes/PROE
 
 #include<Wire.h> //Bilbioteca para la comunicacion I2C
 #include "wiring_private.h" // Necesario para el I2C secundario y usar pinPeripheral() function
 #include <SPI.h> //Biblioteca para la comunicacion por radio frecuencia
 #include <RH_RF69.h> //Biblioteca para la comunicacion por radio frecuencia
-#include <RHDatagram.h>
+#include <RHDatagram.h> // Biblioteca para la comunicación con direcciones
 
 /************ Serial Setup ***************/
-// Con esta configuración se define cuando se utiliza el serial
 #define debug 1
 
 #if debug == 1
@@ -26,7 +21,7 @@
 
 //Variables del enjambre para la comunicación a la base
 uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
@@ -183,6 +178,7 @@ float ayft, gzft;
 
 //Variables para la comunicación por radio frecuencia
 #define RF69_FREQ      915.0    //La frecuencia debe ser la misma que la de los demas nodos.
+#define DEST_ADDRESS   10       //No sé si esto es totalmente necesario, creo que no porque nunca usé direcciones.
 #define MY_ADDRESS     idRobot  //Dirección de este nodo. La base la usa para enviar el reloj al inicio
 //Definición de pines. Creo que no todos se están usando, me parece que el LED no.
 #define RFM69_CS       8
@@ -196,17 +192,19 @@ RHDatagram rf69_manager(rf69, MY_ADDRESS);
 
 //Variables para el mensaje que se va a transmitir a la base
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
-unsigned long tiempoRobotTDMA = 50; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
+unsigned long tiempoRobotTDMA = 20; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
 unsigned long tiempoCicloTDMA = cantidadRobots * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
 unsigned long timeStamp1; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene apenas se recibe el reloj.
 unsigned long timeStamp2; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene al guardar en memoria el reloj.
 unsigned long data; //Variable donde se almacenará el valor del reloj del máster.
 volatile bool mensajeCreado = false; //Bandera booleana para saber si ya debo crear otro mensaje cuando esté en modo transmisor.
-uint8_t mensaje[5 * sizeof(uint16_t) + sizeof(uint8_t)]; //El mensaje a enviar. Llevará 6 datos tipo float: (robotID, xP, yP, phi, tipoObs, rObs, alphaObst)
-uint16_t* ptrMensaje; //Puntero para descomponer el float en bytes.
 const uint8_t timeOffset = 2; //Offset que existe entre el máster enviando y el nodo recibiendo.
-uint8_t buf[RH_RF69_MAX_MESSAGE_LEN]; //Buffer para recibir mensajes.
+
+uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 uint8_t len = sizeof(buf);
+uint8_t from;
+uint16_t* ptrMensaje; //Puntero para descomponer datos en bytes.
+uint8_t mensaje[5 * sizeof(uint16_t) + sizeof(uint8_t)]; // Mensaje a enviar a la base
 
 //Variables para calcular el giro real
 float anguloInicial;
@@ -226,8 +224,9 @@ bool cambio21=false;
 int c = 0; //Contador para led 13
 int b = 0;
 
-void setup() {
 
+
+void setup() {
   //asignación de pines
   pinMode(PWMA, OUTPUT);
   pinMode(AIN1, OUTPUT);
@@ -258,7 +257,9 @@ void setup() {
   direccionGlobal = (orientacionesRobot)(random(-1, 2) * 90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
   
   //***Inicialización de puertos seriales***
-  Serial.begin(9600); //Puerto serie para comunicación con la PC
+  if (debug == 1){
+    Serial.begin(9600); //Puerto serie para comunicación con la PC
+  }
   Wire.begin(); //Puerto I2C para hablar con el STM32. Feather es master
   Wire.setClock(400000); //Velocidad del bus en Fast Mode
   segundoI2C.begin();  //Puerto I2C para comunicarse con los sensores periféricos (Mag, IMU, EEPROM)
@@ -284,7 +285,7 @@ void setup() {
   digitalWrite(RFM69_RST, LOW);
   delay(10);
 
-  if (!rf69.init()) {
+  if (!rf69_manager.init()) {
     serialPrintln("RFM69 inicialización fallida");
     while (1);
   }
@@ -294,6 +295,7 @@ void setup() {
   }
 
   rf69.setTxPower(20, true); // Configura la potencia
+  
   rf69.setModeRx();
 
   /****Inicialización del RTC****/
@@ -331,6 +333,14 @@ void loop(){
   //revisaEncoders(); 
   RecorrerObstaculos();
 
+  if (rf69_manager.available()){
+    if (rf69_manager.recvfrom(buf, &len, &from)){
+      buf[len] = 0;
+      serialPrint(from);serialPrint("; ");serialPrint(*(int16_t*)&buf[0]);serialPrint("; ");serialPrint(*(int16_t*)&buf[2]);
+      serialPrint("; ");serialPrint(*(int16_t*)&buf[4]);serialPrint("; ");serialPrint((int8_t)buf[6]);
+      serialPrint("; ");serialPrint(*(int16_t*)&buf[7]);serialPrint("; ");serialPrintln(*(int16_t*)&buf[9]);
+    }
+  }
 
   //***MAQUINA DE ESTADOS*** Donde se manejan los comportamientos del robot y el control PID
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
@@ -486,6 +496,8 @@ void CrearObstaculo(int tipoSensor, int distancia, int angulo){
   nuevoObstaculo = true;
 }
 
+
+
 /// \brief Crea el mensaje a ser enviado 
 /// \param poseX Posición X del robot
 /// \param poseY Posición Y del robot
@@ -505,6 +517,10 @@ void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int dista
     uint8_t tipo = (uint8_t)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
     uint16_t rObs = (uint16_t)distanciaX;         //Distancia medida por el sharp si aplica
     uint16_t alphaObs = (uint16_t)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
+
+    serialPrint(rf69_manager.thisAddress());serialPrint("; ");serialPrint(poseX);serialPrint("; ");serialPrint(poseY);
+    serialPrint("; ");serialPrint(rotacion);serialPrint("; ");serialPrint(tipoSensorX);
+    serialPrint("; ");serialPrint(distanciaX);serialPrint("; ");serialPrintln(anguloX);
 
     //Construyo mensaje (es una construcción bastante manual que podría mejorar)
     ptrMensaje = (uint16_t*)&xP;       //Utilizo el puntero para extraer la información del dato flotante.
@@ -556,15 +572,8 @@ void RecorrerObstaculos(){
       }
     }
       
-    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]);
-    
-    serialPrint(rf69_manager.thisAddress());serialPrint("; ");
-    serialPrint(datosSensores[minEnviado][0]);serialPrint("; ");
-    serialPrint(datosSensores[minEnviado][1]);serialPrint("; ");
-    serialPrint(datosSensores[minEnviado][2]);serialPrint("; ");
-    serialPrint(datosSensores[minEnviado][3]);serialPrint("; ");
-    serialPrint(datosSensores[minEnviado][4]);serialPrint("; ");
-    serialPrintln(datosSensores[minEnviado][5]);
+    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
+    //CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], datosSensores[ultimoObstaculo][3], datosSensores[ultimoObstaculo][4], datosSensores[ultimoObstaculo][5]); //Enviar solo ultimo obstaculo para debugging
    }
 }
 
@@ -1364,11 +1373,9 @@ inline bool RTCisSyncing() {
   return (RTC->MODE0.STATUS.bit.SYNCBUSY);
 }
 
-/// \fn void sincronizacion()
-/// \brief Espera que se realice la sincronización del clock
 void sincronizacion() {
   while (!timeReceived) { //Espera mensaje de sincronización de la base
-    if (rf69_manager.available()){                                                // Espera a recibir un mensaje
+    if (rf69.available()){                                                // Espera a recibir un mensaje
       uint8_t len = sizeof(buf);                                                  //Obtengo la longitud máxima del mensaje a recibir
       timeStamp1 = RTC->MODE0.COUNT.reg;
       if (rf69.recv(buf, &len)) {                                     //Llamo a recv() si recibí algo. El timeStamp1 guarda el valor del RTC del nodo en el momento en que comienza a procesar el mensaje.
@@ -1379,23 +1386,39 @@ void sincronizacion() {
         RTC->MODE0.COUNT.reg = masterClock;                                       //Seteo el RTC del nodo al tiempo del master.
         RTC->MODE0.COMP[0].reg = masterClock + idRobot * tiempoRobotTDMA + 50;    //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
         while (RTCisSyncing());                                                   //Espero la sincronización.
-        
+
         serialPrintln("¡Reloj del máster clock recibido!");
-        serialPrint("Robot #"); serialPrintln(MY_ADDRESS);
         timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
+        //Wire.onReceive(RecibirI2C);
       }
     }
   }
+}
+
+void config32kOSC() {
+  //Función que configura el reloj de cristal, en caso de querer usar este reloj. Se debe estudiar más a detalle los comandos.
+#ifndef CRYSTALLESS
+  SYSCTRL->XOSC32K.reg = SYSCTRL_XOSC32K_ONDEMAND |
+                         SYSCTRL_XOSC32K_RUNSTDBY |
+                         SYSCTRL_XOSC32K_EN32K |
+                         SYSCTRL_XOSC32K_XTALEN |
+                         SYSCTRL_XOSC32K_STARTUP(6) |
+                         SYSCTRL_XOSC32K_ENABLE;
+#endif
 }
 
 void configureClock() {
   //Función que configura el clock. Se debe estudiar más a detalle los comandos.
   GCLK->GENDIV.reg = GCLK_GENDIV_ID(2) | GCLK_GENDIV_DIV(4);
   while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
-  
-  GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_XOSC32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
+
+  #ifdef CRYSTALLESS
+    GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_OSCULP32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
+  #else
+    GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_XOSC32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
+  #endif
+
   while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
-  
   GCLK->CLKCTRL.reg = (uint32_t)((GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK2 | (RTC_GCLK_ID << GCLK_CLKCTRL_ID_Pos)));
   while (GCLK->STATUS.bit.SYNCBUSY);
 }

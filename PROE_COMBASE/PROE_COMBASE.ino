@@ -1,10 +1,5 @@
-/** \file PROE_COMBASE.ino
- * \author PROE
- * \link https://github.com/jcbrenes/PROE \endlink
- * \brief Código de feather base
- * Código de feather base que recibe datos de los robots en el campo y los 
- * envia por usb al puerto serial en el formato predefinido
-*/
+//Código de feather base que recibe datos de los robots en el campo y los envia por usb al puerto serial en el formato predefinido
+
 
 #include <SPI.h>
 #include <RH_RF69.h>
@@ -36,17 +31,16 @@ RHDatagram rf69_manager(rf69, MY_ADDRESS);
 
 // Declaración de variables
 unsigned long timeStamp1;
-
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 uint8_t len = sizeof(buf);
 uint8_t from;
 
-int posX;
-int posY;
-int rot;
-int tipSens;
-int dis;
-int angulo;
+int16_t posX;
+int16_t posY;
+int16_t rot;
+int8_t tipSens;
+int16_t dis;
+int16_t angulo;
 
 int c = 0;
 
@@ -55,65 +49,56 @@ void setup()
   /****General****/
   if (debug == 1){
     Serial.begin(9600);
-    while (!Serial); // wait until serial console is open
+    while (!Serial); // wait until serial console is open, remove if not tethered to computer 
   }
-
-  serialPrintln("Nodo base de control");
-
   pinMode(LED, OUTPUT);     
   pinMode(RFM69_RST, OUTPUT);
   digitalWrite(RFM69_RST, LOW);
 
-  /****RF****/
-  // Reseteo manual del RF
+  serialPrintln("Prueba base");
+  serialPrintln();
+
+  // manual reset
   digitalWrite(RFM69_RST, HIGH);
   delay(10);
   digitalWrite(RFM69_RST, LOW);
   delay(10);
   
   if (!rf69_manager.init()) {
-    serialPrintln("RFM69 inicialización fallida");
+    serialPrintln("RFM69 radio init failed");
     while (1);
   }
   serialPrintln("RFM69 radio init OK!");
+  Serial.println("RFM69 radio init OK!");
   
   // Setear frecuencia
   if (!rf69.setFrequency(RF69_FREQ)) {
-    serialPrintln("setFrequency failed");
+    Serial.println("setFrequency failed");
   }
 
   // Configurar potencia
   rf69.setTxPower(20, true);   //Rango de 14-20 para la potencia, segundo argumento debe ser verdadero para el 69HCW.
 
-  serialPrint("RFM69 radio @");  serialPrint((int)RF69_FREQ);  serialPrintln(" MHz");
+  Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
 
-  /***** Envío del clock *****/
-  sincronizar();
+  sincronizar(); // Envía el valor de clock a los robots del enjambre
 }
 
 void loop() {
-  uint8_t len = sizeof(buf);
-
+  // Código
   if (rf69_manager.available()){
     if (rf69_manager.recvfrom(buf, &len, &from)){
       buf[len] = 0;
-      posX = (int)(buf[1] << 8 | buf[0]);
-      posY = (int)(buf[3] << 8 | buf[2]);
-      rot = (int)(buf[5] << 8 | buf[4]);
-      tipSens = (int)buf[6];
-      dis = (int)(buf[8] << 8 | buf[7]);
-      angulo = (int)(buf[10] << 8 | buf[9]);
-      serialPrint(from);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
-      serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
-      serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrintln(angulo);
+      posX = *(int16_t*)&buf[0];
+      posY = *(int16_t*)&buf[2];
+      rot = *(int16_t*)&buf[4];
+      tipSens = (int8_t)buf[6];
+      dis = *(int16_t*)&buf[7];
+      angulo = *(int16_t*)&buf[9];
     }
-  }
-
-  if(Serial.available()){ //Si se recibe algo por el serial vuelve a mandar la señal de sincronización, evita tener que reiniciar el feather
-    while(Serial.available()){ //Limpiar el buffer del serial
-      Serial.read();
-    }
-    sincronizar();
+    serialPrint(from);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
+    serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
+    serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrintln(angulo);
   }
   
   actividad();
