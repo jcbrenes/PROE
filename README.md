@@ -38,9 +38,7 @@ Investigadores:
 - Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
 
 Asistentes:
-- Sebastián Barquero Meléndez sebas.barque@gmail.com
-- Joselyn Murillo Rodríguez joselyn.dmurillo97@gmail.com  
 - Bryan Alpízar Quesada bryan2300@gmail.com
-- Kevin Morales Paz kevinmoralespaz@gmail.com
 - Andrés Jiménez Mora andjm1428@gmail.com
 - Célimo Porras Aguilar celimojosepa@estudiantec.cr
+- David Gómez Carrasquilla davidjgomezc@gmail.com
