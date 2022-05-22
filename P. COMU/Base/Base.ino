@@ -23,7 +23,7 @@
 #define RF69_FREQ 915.0
 
 // change addresses for each client board,
-#define MY_ADDRESS     1
+#define MY_ADDRESS     0
 
 #define RFM69_CS      8
 #define RFM69_INT     3
@@ -49,6 +49,15 @@ int unidadAvance = 485; // Medida en mm que avanza cada robot por movimiento
 
 // Dont put this on the stack:
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+uint8_t len = sizeof(buf);
+uint8_t from;
+
+int posX;
+int posY;
+int rot;
+int tipSens;
+int dis;
+int angulo;
 
 void setup()
 {
@@ -84,66 +93,39 @@ void setup()
   rf69.setTxPower(20, true); // Configura la potencia
   rf69.setModeRx();
 
-  /****Inicialización del RTC****/
-  PM->APBAMASK.reg |= PM_APBAMASK_RTC;  //Seteo la potencia para el reloj del RTC.
-  configureClock();                     //Seteo reloj interno de 32kHz.
-  RTCdisable();                         //Deshabilito RTC. Hay configuraciones que solo se pueden hacer si el RTC está deshabilitado, revisar datasheet.
-  RTCreset();                           //Reseteo RTC.
-
-  RTC->MODE0.CTRL.reg = 2UL;            //Esto en binario es 0000000000000010. Esa es la configuración que ocupo en el registro. Ver capítulo 19 del datasheet.
-  while (RTCisSyncing());               //Llamo a función de escritura. Hay bits que deben ser sincronizados cada vez que se escribe en ellos. Esto lo hice por precaución..
-  RTC->MODE0.COUNT.reg = 0UL;           //Seteo el contador en 0 para iniciar.
-  while (RTCisSyncing());               //Llamo a función de escritura.
-  RTC->MODE0.COMP[0].reg = tiempoRobotTDMA;    //Valor inicial solo por poner un valor. Más adelante, apenas reciba el clock del master, ya actualiza este valor correctamente. ¿Por qué debo agregar el [0]? Esto nunca lo entendí.
-  while (RTCisSyncing());               //Llamo a función de escritura.
-
-  RTC->MODE0.INTENSET.bit.CMP0 = true;  //Habilito la interrupción.
-  RTC->MODE0.INTFLAG.bit.CMP0 = true;   //Remover la bandera de interrupción.
-
-  NVIC_EnableIRQ(RTC_IRQn);             //Habilito la interrupción del RTC en el "Nested Vestor
-  NVIC_SetPriority(RTC_IRQn, 0x00);     //Seteo la prioridad de la interrupción. Esto se debe investigar más.
-  RTCenable();                          //Habilito de nuevo el RTC.
-  RTCresetRemove();                     //Quito el reset del RTC.
-
   serialPrintln("¡RFM69 radio en funcionamiento!");
   
   pinMode(LED, OUTPUT);
 
   serialPrint("RFM69 radio @");  serialPrint((int)RF69_FREQ);  serialPrintln(" MHz");
   
-  sendUnidadAvance(&unidadAvance); // Envía la unidad de avance en mm a utilizar por los robots
+  //sendUnidadAvance(&unidadAvance); // Envía la unidad de avance en mm a utilizar por los robots
   
-  sendCantidadRobots(&cantidadRobots); // Envía la cantidad de robots en el enjambre
+  //sendCantidadRobots(&cantidadRobots); // Envía la cantidad de robots en el enjambre
 
   sincronizar(); // Envía el valor de clock a los robots del enjambre
 }
 
 void loop() {
   // Código
-}
-
-/// \fn void Blink(byte PIN, byte DELAY_MS, byte loops)
-/// \param PIN Salida del PIN a parpadear
-/// \param DELAY_MS Tiempo para intercambiar el valor de salida
-/// \param loops Cuantas veces se quiere intercalar la operación
-/// \brief Realiza un parpadeo en una salida con un ciclo de trabajo del 50%
-void Blink(byte PIN, byte DELAY_MS, byte loops) {
-  for (byte i=0; i<loops; i++)  {
-    digitalWrite(PIN,HIGH);
-    delay(DELAY_MS);
-    digitalWrite(PIN,LOW);
-    delay(DELAY_MS);
+  if (rf69_manager.available()){
+    if (rf69_manager.recvfrom(buf, &len, &from)){
+      buf[len] = 0;
+      posX = (int)(buf[1] << 8 | buf[0]);
+      posY = (int)(buf[3] << 8 | buf[2]);
+      rot = (int)(buf[5] << 8 | buf[4]);
+      tipSens = (int)buf[6];
+      dis = (int)(buf[8] << 8 | buf[7]);
+      angulo = (int)(buf[10] << 8 | buf[9]);
+    }
+    serialPrint(from);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
+    serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
+    serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrintln(angulo);
   }
-}
-
-void sendBroadcast(char message[RH_RF69_MAX_MESSAGE_LEN]){
-  serialPrint("Sending: "); Serial.println(message);
-  rf69_manager.sendto((uint8_t *)message, strlen(message), 255);
 }
 
 /**** RTC FUNCIONES****/
 
-/// \fn sendCantidadRobots(int *cantRobots)
 /// \param cantRobots Puntero hacía la variable con la cantidad de robots en el enjambre
 /// \return Devuelve true si se envía el mensaje y false en caso contrario
 bool sendCantidadRobots(int *cantRobots){
@@ -155,7 +137,6 @@ bool sendCantidadRobots(int *cantRobots){
   return rf69_manager.sendto(dataCantRobots, sizeof(dataCantRobots), RH_BROADCAST_ADDRESS);
 }
 
-/// \fn sendUnidadAvance(int Avance)
 /// \param Avance Unidad de avance para los robots
 /// \return Devuelve true si se envía el mensaje y false en caso contrario
 bool sendUnidadAvance(int *Avance){
@@ -167,7 +148,6 @@ bool sendUnidadAvance(int *Avance){
   return rf69_manager.sendto(dataUnidadAvance, sizeof(dataUnidadAvance), RH_BROADCAST_ADDRESS);
 }
 
-/// \fn bool sincronizar()
 /// \brief Envía el valor del clock en el registro para sincronizar los robots.
 /// \return Devuelve true si se envía el mensaje y false en caso contrario.
 bool sincronizar(){
@@ -179,61 +159,4 @@ bool sincronizar(){
   }
 
   return rf69_manager.sendto(reloj, sizeof(reloj), RH_BROADCAST_ADDRESS);     //Enviar valor del RTC al esclavo
-}
-
-/// \fn inline bool RTCisSyncing()
-/// \brief Ver si SAMD21 está sincronizando los valores del registro
-/// \return Devuelve el bite de sincronización
-inline bool RTCisSyncing() {
-  //Función que lee el bit de sincronización de los registros
-  return (RTC->MODE0.STATUS.bit.SYNCBUSY);
-}
-
-void configureClock() {
-  //Función que configura el clock. Se debe estudiar más a detalle los comandos.
-  GCLK->GENDIV.reg = GCLK_GENDIV_ID(2) | GCLK_GENDIV_DIV(4);
-  while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
-
-  GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_XOSC32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
-  while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
-  
-  GCLK->CLKCTRL.reg = (uint32_t)((GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK2 | (RTC_GCLK_ID << GCLK_CLKCTRL_ID_Pos)));
-  while (GCLK->STATUS.bit.SYNCBUSY);
-}
-
-void RTCdisable() {
-  //Función que deshabilita el RTC.
-  RTC->MODE0.CTRL.reg &= ~RTC_MODE0_CTRL_ENABLE; // disable RTC
-  while (RTCisSyncing());
-}
-
-void RTCenable() {
-  //Función que habilita el RTC.
-  RTC->MODE0.CTRL.reg |= RTC_MODE0_CTRL_ENABLE; // enable RTC
-  while (RTCisSyncing());
-}
-
-void RTCreset() {
-  //Función que resetea el RTC.
-  RTC->MODE0.CTRL.reg |= RTC_MODE0_CTRL_SWRST; // software reset
-  while (RTCisSyncing());
-}
-
-void RTCresetRemove() {
-  //Función que quita el reset del RTC.
-  RTC->MODE0.CTRL.reg &= ~RTC_MODE0_CTRL_SWRST; // software reset remove
-  while (RTCisSyncing());
-}
-
-void RTC_Handler(void) {
-  //Vector de interrupción.
-  if (RTC->MODE0.COUNT.reg > 0x00000064) {      //Si el valor del contador es mayor a 0x64 (100 en decimal) entonces haga la interrupción. Esto para evitar el problema que la interrupción se llame al puro inicio. No sé por qué pasaba esto, investigar más el tema.
-    RTC->MODE0.COMP[0].reg += tiempoCicloTDMA;  //Quiero que haga una interrupción en el próximos ciclo del TDMA, actualizo el nuevo valor a comparar.  **¿Por qué debo agregar el [0]?**
-    while (RTCisSyncing());                     //Llamo a función de escritura.
-
-    timeStamp1 = RTC->MODE0.COUNT.reg;
-    Serial.println(timeStamp1, 10);
-    
-    RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
-  }
 }

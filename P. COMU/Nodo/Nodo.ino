@@ -6,7 +6,7 @@
 #include <RHDatagram.h>
 
 /************ Serial Setup ***************/
-#define debug 1
+#define debug 0
 
 #if debug == 1
 #define serialPrint(x) Serial.print(x)
@@ -18,16 +18,18 @@
 
 
 //**** Variables para las pruebas en el laboratorio ****//
-uint8_t cantidadRobots; // Cantidad de robots en el enjambre 
+uint8_t cantidadRobots = 2; // Cantidad de robots en el enjambre 
 int unidadAvance; // Unidad en mm que avance cada robots del enjambre
 bool dataRecieved = false; // Se comprueba que se haya recibido el dato
+
+unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 /************ Radio Setup ***************/
 
 //Variables para el mensaje que se va a transmitir a la base
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
-unsigned long tiempoRobotTDMA = 50; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
-unsigned long tiempoCicloTDMA = 10 * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
+unsigned long tiempoRobotTDMA = 20; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
+unsigned long tiempoCicloTDMA = cantidadRobots * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
 unsigned long timeStamp1; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene apenas se recibe el reloj.
 unsigned long timeStamp2;
 const uint8_t timeOffset = 2;
@@ -35,12 +37,22 @@ unsigned long data; //Variable donde se almacenará el valor del reloj del mást
 unsigned long tiempo;
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 uint8_t len = sizeof(buf);
+uint16_t* ptrMensaje; //Puntero para descomponer datos en bytes.
+uint8_t mensaje[5 * sizeof(uint16_t) + sizeof(uint8_t)]; // Mensaje a enviar a la base
+volatile bool mensajeCreado = false;
+
+int posX = 0;
+int posY = 500;
+int rot = 12803;
+int tipSens = 3;
+int dis = 1004;
+int angulo = 1780;
 
 // Frecuencia a la que se va a trabajar con el RF69
 #define RF69_FREQ 915.0
 
 // Dirección del robot
-#define MY_ADDRESS     8
+#define MY_ADDRESS    idRobot
 
 #define RFM69_CS      8
 #define RFM69_INT     3
@@ -117,26 +129,72 @@ void setup()
   pinMode(LED, OUTPUT);
 
   serialPrint("RFM69 radio @");  serialPrint((int)RF69_FREQ);  serialPrintln(" MHz");
-  
-  unidadAvance = waitUnidadAvance(&dataRecieved);
-  serialPrint("Unidad de avance: "); Serial.println(unidadAvance, 10);
-  dataRecieved = false;
-
-  cantidadRobots = waitCantidadRobots(&dataRecieved);
-  serialPrint("Cantidad de robots recibido: "); Serial.println(cantidadRobots, 10);
-  dataRecieved = false;
 }
 
 void loop() {
     sincronizacion();
+    CrearMensaje(posX, posY, rot, tipSens, dis, angulo);
 }
 
-void Blink(byte PIN, int DELAY_MS, byte loops) {
-  for (byte i=0; i<loops; i++)  {
-    digitalWrite(PIN,HIGH);
-    delay(DELAY_MS);
-    digitalWrite(PIN,LOW);
-    delay(DELAY_MS);
+/// \brief Crea el mensaje a ser enviado 
+/// \param poseX Posición X del robot
+/// \param poseY Posición Y del robot
+/// \param rotacion Ángulo del robot
+/// \param tipoSensorX Obtáculo encontrado
+/// \param distanciaX Distancia del obstáculo
+/// \param anguloX Ángulo detección obstáculo
+void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int distanciaX, int anguloX){ 
+//Crea el mensaje a ser enviado por comunicación RF. Es usado en la interrupcion del RTC
+  
+  if(timeReceived && !mensajeCreado){       //Aquí solo debe enviar mensajes, pero eso lo hace la interrupción, así que aquí se construyen mensajes y se espera a que la interrupción los envíe.
+
+    float frac = 0.867;                     //Fracción que se usa para insertarle a los random decimales. Se escogió al azar, el número no significa nada.
+
+    //Genero números al azar acorde a lo que el robot eventualmente podría enviar
+    uint16_t xP = (uint16_t)poseX;                //Posición X en que se detecto el obstaculo
+    uint16_t yP = (uint16_t)poseY;                //Posición Y en que se detecto el obstaculo
+    uint16_t phi = (uint16_t)rotacion;            //"Orientación" del robot
+    uint8_t tipo = (uint8_t)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
+    uint16_t rObs = (uint16_t)distanciaX;         //Distancia medida por el sharp si aplica
+    uint16_t alphaObs = (uint16_t)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
+
+    serialPrint(MY_ADDRESS);serialPrint("; ");serialPrint(poseX);serialPrint("; ");serialPrint(poseY);
+    serialPrint("; ");serialPrint(rotacion);serialPrint("; ");serialPrint(tipoSensorX);
+    serialPrint("; ");serialPrint(distanciaX);serialPrint("; ");serialPrintln(anguloX);
+
+    //Construyo mensaje (es una construcción bastante manual que podría mejorar)
+    ptrMensaje = (uint16_t*)&xP;       //Utilizo el puntero para extraer la información del dato flotante.
+    for (uint8_t i = 0; i < 2; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << i * 8)) >> i * 8; //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
+    }
+
+    ptrMensaje = (uint16_t*)&yP;
+    for (uint8_t i = 2; i < 4; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 2) * 8)) >> (i - 2) * 8;
+    }
+
+    ptrMensaje = (uint16_t*)&phi;
+    for (uint8_t i = 4; i < 6; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 4) * 8)) >> (i - 4) * 8;
+    }
+
+    ptrMensaje = (uint16_t*)&tipo;
+    for (uint8_t i = 6; i < 7; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 6) * 8)) >> (i - 6) * 8;
+    }
+
+    ptrMensaje = (uint16_t*)&rObs;
+    for (uint8_t i = 7; i < 9; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 7) * 8)) >> (i - 7) * 8;
+    }
+
+    ptrMensaje = (uint16_t*)&alphaObs;
+    for (uint8_t i = 9; i < 11; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 9) * 8)) >> (i - 9) * 8;
+    }
+
+    //Una vez creado el mensaje, no vuelvo a crear otro hasta que la interrupción baje la bandera.
+    mensajeCreado = true;
   }
 }
 
@@ -184,14 +242,17 @@ void RTCresetRemove() {
 }
 
 void RTC_Handler(void) {
+
   //Vector de interrupción.
   if (RTC->MODE0.COUNT.reg > 0x00000064) {      //Si el valor del contador es mayor a 0x64 (100 en decimal) entonces haga la interrupción. Esto para evitar el problema que la interrupción se llame al puro inicio. No sé por qué pasaba esto, investigar más el tema.
     RTC->MODE0.COMP[0].reg += tiempoCicloTDMA;  //Quiero que haga una interrupción en el próximos ciclo del TDMA, actualizo el nuevo valor a comparar.  **¿Por qué debo agregar el [0]?**
     while (RTCisSyncing());                     //Llamo a función de escritura.
-
-    timeStamp1 = RTC->MODE0.COUNT.reg;
-    Serial.println(timeStamp1, 10);
     
+    posX += 1;
+    
+    rf69_manager.sendto(mensaje, sizeof(mensaje), RH_BROADCAST_ADDRESS);
+    mensajeCreado = false;
+
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }
 }
@@ -208,11 +269,11 @@ void sincronizacion() {
         timeStamp2 = RTC->MODE0.COUNT.reg;                                        //Una vez procesado el mensaje del reloj del máster, guardo otra estampa de tiempo para eliminar este tiempo de procesamiento.
         unsigned long masterClock = data + (timeStamp2 - timeStamp1) + timeOffset; //Calculo reloj del master como: lo enviado por el máster (data) + lo que dura el mensaje en llegarme (timeOffset) + lo que duré procesando el mensaje (tS2-tS1).
         RTC->MODE0.COUNT.reg = masterClock;                                       //Seteo el RTC del nodo al tiempo del master.
-        RTC->MODE0.COMP[0].reg = masterClock + 2 * tiempoRobotTDMA + 50;    //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
+        RTC->MODE0.COMP[0].reg = masterClock + idRobot * tiempoRobotTDMA + 50;    //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
         
         while (RTCisSyncing());                                                   //Espero la sincronización
         timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
-        Serial.print("¡Reloj del máster clock recibido!");
+        serialPrintln("¡Reloj del máster clock recibido!");
       }
     }
   }
@@ -233,7 +294,7 @@ int waitUnidadAvance(bool *messageRecieved){
             }
         }
     }
-    return (int)data;    
+    return (int)data;
 }
 
 /// \fn int waitCantidadRobots()

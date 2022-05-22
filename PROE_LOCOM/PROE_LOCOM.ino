@@ -6,10 +6,22 @@
 #include "wiring_private.h" // Necesario para el I2C secundario y usar pinPeripheral() function
 #include <SPI.h> //Biblioteca para la comunicacion por radio frecuencia
 #include <RH_RF69.h> //Biblioteca para la comunicacion por radio frecuencia
+#include <RHDatagram.h> // Biblioteca para la comunicación con direcciones
+
+/************ Serial Setup ***************/
+#define debug 1
+
+#if debug == 1
+#define serialPrint(x) Serial.print(x)
+#define serialPrintln(x) Serial.println(x)
+#else
+#define serialPrint(x)
+#define serialPrintln(x)
+#endif
 
 //Variables del enjambre para la comunicación a la base
-uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 3; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 //constantes del robot empleado
 const int tiempoMuestreo=10000; //unidades: micro segundos
@@ -172,20 +184,27 @@ float ayft, gzft;
 #define RFM69_CS       8
 #define RFM69_INT      3
 #define RFM69_RST      4
+
 RH_RF69 rf69(RFM69_CS, RFM69_INT); // Inicialización del driver de la biblioteca Radio Head.
 
+// Class to manage message delivery and receipt, using the driver declared above
+RHDatagram rf69_manager(rf69, MY_ADDRESS);
+
 //Variables para el mensaje que se va a transmitir a la base
-uint8_t buf[RH_RF69_MAX_MESSAGE_LEN]; //Buffer para recibir mensajes.
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
-unsigned long tiempoRobotTDMA = 50; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
+unsigned long tiempoRobotTDMA = 20; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
 unsigned long tiempoCicloTDMA = cantidadRobots * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
 unsigned long timeStamp1; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene apenas se recibe el reloj.
 unsigned long timeStamp2; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene al guardar en memoria el reloj.
 unsigned long data; //Variable donde se almacenará el valor del reloj del máster.
 volatile bool mensajeCreado = false; //Bandera booleana para saber si ya debo crear otro mensaje cuando esté en modo transmisor.
-uint8_t mensaje[7 * sizeof(float)]; //El mensaje a enviar. Llevará 6 datos tipo float: (robotID, xP, yP, phi, tipoObs, rObs, alphaObst)
-uint32_t* ptrMensaje; //Puntero para descomponer el float en bytes.
 const uint8_t timeOffset = 2; //Offset que existe entre el máster enviando y el nodo recibiendo.
+
+uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
+uint8_t len = sizeof(buf);
+uint8_t from;
+uint16_t* ptrMensaje; //Puntero para descomponer datos en bytes.
+uint8_t mensaje[5 * sizeof(uint16_t) + sizeof(uint8_t)]; // Mensaje a enviar a la base
 
 //Variables para calcular el giro real
 float anguloInicial;
@@ -238,7 +257,9 @@ void setup() {
   direccionGlobal = (orientacionesRobot)(random(-1, 2) * 90); //Se asigna aleatoriamente una dirección global a seguir por el algoritmo RWD
   
   //***Inicialización de puertos seriales***
-  Serial.begin(115200); //Puerto serie para comunicación con la PC
+  if (debug == 1){
+    Serial.begin(9600); //Puerto serie para comunicación con la PC
+  }
   Wire.begin(); //Puerto I2C para hablar con el STM32. Feather es master
   Wire.setClock(400000); //Velocidad del bus en Fast Mode
   segundoI2C.begin();  //Puerto I2C para comunicarse con los sensores periféricos (Mag, IMU, EEPROM)
@@ -264,21 +285,17 @@ void setup() {
   digitalWrite(RFM69_RST, LOW);
   delay(10);
 
-  if (!rf69.init()) {
-    Serial.println("RFM69 inicialización fallida");
+  if (!rf69_manager.init()) {
+    serialPrintln("RFM69 inicialización fallida");
     while (1);
   }
   // Setear frecuencia
   if (!rf69.setFrequency(RF69_FREQ)) {
-    Serial.println("setFrequency failed");
+    serialPrintln("setFrequency failed");
   }
 
   rf69.setTxPower(20, true); // Configura la potencia
-  uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-                    0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08
-                  };
-
-  rf69.setEncryptionKey(key);
+  
   rf69.setModeRx();
 
   /****Inicialización del RTC****/
@@ -302,7 +319,7 @@ void setup() {
   RTCenable();                          //Habilito de nuevo el RTC.
   RTCresetRemove();                     //Quito el reset del RTC.
 
-  Serial.println("¡RFM69 radio en funcionamiento!");
+  serialPrintln("¡RFM69 radio en funcionamiento!");
   delay(20);
 }
 
@@ -316,7 +333,14 @@ void loop(){
   //revisaEncoders(); 
   RecorrerObstaculos();
 
-
+  if (rf69_manager.available()){
+    if (rf69_manager.recvfrom(buf, &len, &from)){
+      buf[len] = 0;
+      serialPrint(from);serialPrint("; ");serialPrint(*(int16_t*)&buf[0]);serialPrint("; ");serialPrint(*(int16_t*)&buf[2]);
+      serialPrint("; ");serialPrint(*(int16_t*)&buf[4]);serialPrint("; ");serialPrint((int8_t)buf[6]);
+      serialPrint("; ");serialPrint(*(int16_t*)&buf[7]);serialPrint("; ");serialPrintln(*(int16_t*)&buf[9]);
+    }
+  }
 
   //***MAQUINA DE ESTADOS*** Donde se manejan los comportamientos del robot y el control PID
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
@@ -474,56 +498,59 @@ void CrearObstaculo(int tipoSensor, int distancia, int angulo){
 
 
 
+/// \brief Crea el mensaje a ser enviado 
+/// \param poseX Posición X del robot
+/// \param poseY Posición Y del robot
+/// \param rotacion Ángulo del robot
+/// \param tipoSensorX Obtáculo encontrado
+/// \param distanciaX Distancia del obstáculo
+/// \param anguloX Ángulo detección obstáculo
 void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int distanciaX, int anguloX){ 
 //Crea el mensaje a ser enviado por comunicación RF. Es usado en la interrupcion del RTC
   
   if(timeReceived && !mensajeCreado){       //Aquí solo debe enviar mensajes, pero eso lo hace la interrupción, así que aquí se construyen mensajes y se espera a que la interrupción los envíe.
 
-    float frac = 0.867;                     //Fracción que se usa para insertarle a los random decimales. Se escogió al azar, el número no significa nada.
-
     //Genero números al azar acorde a lo que el robot eventualmente podría enviar
-    float robotID = (float)idRobot;         //Esta variable se debe volver a definir, pues idRobot al ser global presenta problema al crear el mensaje.
-    float xP = (float)poseX;                //Posición X en que se detecto el obstaculo
-    float yP = (float)poseY;                //Posición Y en que se detecto el obstaculo
-    float phi = (float)rotacion;            //"Orientación" del robot
-    float tipo = (float)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
-    float rObs = (float)distanciaX;         //Distancia medida por el sharp si aplica
-    float alphaObs = (float)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
+    uint16_t xP = (uint16_t)poseX;                //Posición X en que se detecto el obstaculo
+    uint16_t yP = (uint16_t)poseY;                //Posición Y en que se detecto el obstaculo
+    uint16_t phi = (uint16_t)rotacion;            //"Orientación" del robot
+    uint8_t tipo = (uint8_t)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
+    uint16_t rObs = (uint16_t)distanciaX;         //Distancia medida por el sharp si aplica
+    uint16_t alphaObs = (uint16_t)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
+
+    serialPrint(rf69_manager.thisAddress());serialPrint("; ");serialPrint(poseX);serialPrint("; ");serialPrint(poseY);
+    serialPrint("; ");serialPrint(rotacion);serialPrint("; ");serialPrint(tipoSensorX);
+    serialPrint("; ");serialPrint(distanciaX);serialPrint("; ");serialPrintln(anguloX);
 
     //Construyo mensaje (es una construcción bastante manual que podría mejorar)
-    ptrMensaje = (uint32_t*)&robotID;       //Utilizo el puntero para extraer la información del dato flotante.
-    for (uint8_t i = 0; i < 4; i++) {
+    ptrMensaje = (uint16_t*)&xP;       //Utilizo el puntero para extraer la información del dato flotante.
+    for (uint8_t i = 0; i < 2; i++) {
       mensaje[i] = (*ptrMensaje & (255UL << i * 8)) >> i * 8; //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
     }
 
-    ptrMensaje = (uint32_t*)&xP;
-    for (uint8_t i = 4; i < 8; i++) {
+    ptrMensaje = (uint16_t*)&yP;
+    for (uint8_t i = 2; i < 4; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 2) * 8)) >> (i - 2) * 8;
+    }
+
+    ptrMensaje = (uint16_t*)&phi;
+    for (uint8_t i = 4; i < 6; i++) {
       mensaje[i] = (*ptrMensaje & (255UL << (i - 4) * 8)) >> (i - 4) * 8;
     }
 
-    ptrMensaje = (uint32_t*)&yP;
-    for (uint8_t i = 8; i < 12; i++) {
-      mensaje[i] = (*ptrMensaje & (255UL << (i - 8) * 8)) >> (i - 8) * 8;
+    ptrMensaje = (uint16_t*)&tipo;
+    for (uint8_t i = 6; i < 7; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 6) * 8)) >> (i - 6) * 8;
     }
 
-    ptrMensaje = (uint32_t*)&phi;
-    for (uint8_t i = 12; i < 16; i++) {
-      mensaje[i] = (*ptrMensaje & (255UL << (i - 12) * 8)) >> (i - 12) * 8;
+    ptrMensaje = (uint16_t*)&rObs;
+    for (uint8_t i = 7; i < 9; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 7) * 8)) >> (i - 7) * 8;
     }
 
-    ptrMensaje = (uint32_t*)&tipo;
-    for (uint8_t i = 16; i < 20; i++) {
-      mensaje[i] = (*ptrMensaje & (255UL << (i - 16) * 8)) >> (i - 16) * 8;
-    }
-
-    ptrMensaje = (uint32_t*)&rObs;
-    for (uint8_t i = 20; i < 24; i++) {
-      mensaje[i] = (*ptrMensaje & (255UL << (i - 20) * 8)) >> (i - 20) * 8;
-    }
-
-    ptrMensaje = (uint32_t*)&alphaObs;
-    for (uint8_t i = 24; i < 28; i++) {
-      mensaje[i] = (*ptrMensaje & (255UL << (i - 24) * 8)) >> (i - 24) * 8;
+    ptrMensaje = (uint16_t*)&alphaObs;
+    for (uint8_t i = 9; i < 11; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << (i - 9) * 8)) >> (i - 9) * 8;
     }
 
     //Una vez creado el mensaje, no vuelvo a crear otro hasta que la interrupción baje la bandera.
@@ -1352,7 +1379,6 @@ void sincronizacion() {
       uint8_t len = sizeof(buf);                                                  //Obtengo la longitud máxima del mensaje a recibir
       timeStamp1 = RTC->MODE0.COUNT.reg;
       if (rf69.recv(buf, &len)) {                                     //Llamo a recv() si recibí algo. El timeStamp1 guarda el valor del RTC del nodo en el momento en que comienza a procesar el mensaje.
-        Serial.println("¡Reloj del máster clock recibido!");
         buf[len] = 0;                                                             //Limpio el resto del buffer.
         data = buf[3] << 24 | buf[2] << 16 | buf[1] << 8 | buf[0];                //Construyo el dato con base en el buffer y haciendo corrimiento de bits.
         timeStamp2 = RTC->MODE0.COUNT.reg;                                        //Una vez procesado el mensaje del reloj del máster, guardo otra estampa de tiempo para eliminar este tiempo de procesamiento.
@@ -1361,6 +1387,7 @@ void sincronizacion() {
         RTC->MODE0.COMP[0].reg = masterClock + idRobot * tiempoRobotTDMA + 50;    //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
         while (RTCisSyncing());                                                   //Espero la sincronización.
 
+        serialPrintln("¡Reloj del máster clock recibido!");
         timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
         //Wire.onReceive(RecibirI2C);
       }
@@ -1426,7 +1453,7 @@ void RTC_Handler(void) {
     RTC->MODE0.COMP[0].reg += tiempoCicloTDMA;  //Quiero que haga una interrupción en el próximos ciclo del TDMA, actualizo el nuevo valor a comparar.  **¿Por qué debo agregar el [0]?**
     while (RTCisSyncing());                     //Llamo a función de escritura.
 
-    rf69.send(mensaje, sizeof(mensaje));        //Llamo a la función de enviar de la biblioteca Radio Head para enviar el mensaje del nodo.
+    rf69_manager.sendto(mensaje, sizeof(mensaje), RH_BROADCAST_ADDRESS);        //Llamo a la función de enviar de la biblioteca Radio Head para enviar el mensaje del nodo.
     mensajeCreado = false;                      //Bajo la bandera para indicar que ya se envió el mensaje y se puede crear uno nuevo.
 
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
@@ -1499,98 +1526,3 @@ void leeMPU(float &gir_ang_z, float &vely) {
   gir_ang_zPrev = gir_ang_z;
   vel_y_Prev = vely;
 }
-
-
-
-
-
-
-//*****Cementerio de funciones. Borrar en Junio 2021********
-
-
-//void RevisarSTM(){ 
-////Comunica al STM mediante pin de interrupcion que esta listo para recibir información de obstaculos 
-//  if((micros()-tiempoSTM)>=tiempoMuestreo/4){ //Atender obstaculos 4 veces por cada ciclo de la maquina de estados
-//    tiempoSTM=micros();
-//    if(estado!=RETROCEDA){ //Ignorar al STM si está retrocediendo
-//      digitalWrite(INT_OBSTACULO,HIGH);
-//      //delay(5);
-//      digitalWrite(INT_OBSTACULO,LOW);
-//      //delay(5);
-//    }
-//  }
-//}
-
-/*
-void ActualizarUbicacion() {
-  //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual
-  distanciaAvanzada = (int)calculaDistanciaLinealRecorrida();
-  if (poseActual[2] == 0 || abs(poseActual[2] == 360)) {
-    poseActual[1] = poseActual[1] + distanciaAvanzada;
-  }
-  else if (poseActual[2] == 90 || poseActual[2] == -270) {
-    poseActual[0] = poseActual[0] + distanciaAvanzada;
-  }
-  else if (poseActual[2] == -90 || poseActual[2] == 270) {
-    poseActual[0] = poseActual[0] - distanciaAvanzada;
-  }
-  else if (abs(poseActual[2]) == 180) {
-    poseActual[1] = poseActual[1] - distanciaAvanzada;
-  }
-  
-}
-*/
-
-//void RecibirI2C ()  {
-//  //Función (tipo Evento) llamada cuando se recibe algo en el puerto I2C conectado al STM32
-//  //Almacena en una matriz las variables de tipo de sensor, distancia y ángulo
-//  int cont = 1;
-//  int tipoSensor = 0;
-//  int distancia = 0;
-//  int angulo = 0;
-//  String acumulado = "";
-//  DeteccionObstaculo();
-//
-//  while (0 < Wire.available()) { // ciclo mientras se reciben todos los datos
-//    char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
-//    if (c == ',') { //los datos vienen separados por coma
-//      if (cont == 1) {
-//        tipoSensor = acumulado.toInt();
-//        acumulado = "";
-//      }
-//      if (cont == 2) {
-//        distancia = acumulado.toInt();
-//        acumulado = "";
-//      }
-//      cont++;
-//    } else if (c == '.') { //el ultimo dato viene con punto al final
-//      angulo = acumulado.toInt();
-//      acumulado = "";
-//      cont = 1;
-//    } else {
-//      acumulado += c;  //añade el caracter a la cadena anterior
-//    }
-//  }
-//
-//  float alphaObs = (float)(medirMagnet() + angulo);
-//  if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
-//    alphaObs = alphaObs - 360;          
-//  }
-//  else if(alphaObs < -180){
-//    alphaObs = alphaObs + 360;
-//  }
-//
-//  alphaObs = alphaObs - magInicioOrigen;
-//  if(alphaObs > 180){ //Correción para tener valores entre -180 y 180
-//    alphaObs = alphaObs - 360;          
-//  }
-//  else if(alphaObs < -180){
-//    alphaObs = alphaObs + 360;
-//  }
-//
-//  CrearObstaculo(tipoSensor, distancia, alphaObs);
-//
-//  //obstaculoEnviado = false;
-//  //CrearMensaje(poseActual[0], poseActual[1], poseActual[2], tipoSensor, distancia, alphaObs);
-//  
-//}
