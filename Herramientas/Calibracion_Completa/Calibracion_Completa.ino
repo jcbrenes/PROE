@@ -4,7 +4,6 @@
 //https://github.com/jcbrenes/PROE
 
 #include <Wire.h>
-#include<math.h>
 #include "wiring_private.h" // pinPeripheral() function
 
 TwoWire myWire(&sercom1, 11, 13);
