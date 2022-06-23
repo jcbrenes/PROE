@@ -34,15 +34,19 @@ const float KiGiro=1.1;//constante control integral
 const float KdGiro=0.17; //constante control derivativo
 
 //Constantes para la implementación del control PID real
-const int errorMinIntegral=-255;
-const int errorMaxIntegral=255;
+const int errorMinIntegralVelocidad=-255;
+const int errorMaxIntegralVelocidad=255;
+const int errorMinIntegralGiro=-110;
+const int errorMaxIntegralGiro=110;
 const int limiteSuperiorCicloTrabajoVelocidad=200;
 const int limiteInferiorCicloTrabajoVelocidad=-200;
-const int limiteSuperiorCicloTrabajoGiro=110;
-const int limiteInferiorCicloTrabajoGiro=-110;
+int limiteSuperiorCicloTrabajoGiro=110;
+int limiteInferiorCicloTrabajoGiro=-110;
+const int limiteSuperiorCicloTrabajoGiroCalibracion=50;
+const int limiteInferiorCicloTrabajoGiroCalibracion=-50;
 const int cicloTrabajoMinimo= 20;
 const int minCiclosEstacionario= 20;
-const float correcionVelRuedas = 0.0;
+const float correcionVelRuedas = 0.5;
 
 //Configuración de pines de salida para conexión con el Puente H
 const int PWMA = 12; //Control velocidad izquierdo
@@ -62,7 +66,7 @@ const int ENC_IZQ_C2 =  A3;
 const int INT_OBSTACULO = A4;
 
 //Almacenamiento de datos de obstáculos
-const int longitudArregloObstaculos = 1000;
+const int longitudArregloObstaculos = 100;
 
 //Constantes algoritmo exploración
 const int unidadAvance= 1000; //medida en mm que avanza cada robot por movimiento
@@ -173,16 +177,11 @@ float ayft, gzft;
 //Variables de calibración para magnetometro 
 const int numSamples=700;
 const int desfase=(1-alfa)*20;
-float rawx[numSamples]; //Lista de datos crudos en x
-float rawy[numSamples]; //Lista de datos crudos en y
 int puntosCalibracion=0; //Contadores para calibración
 float maxX,minX,maxY,minY; // Maximos y minimos de los datos
-//float xoff,yoff; //Guarda los offsets de los set de datos
 float sumXX,sumYY,sumXY; //Sumas para los momentos de inercia
 float uXX,uYY,uXY; //Momentos de inercia
 float angulo; //Angulo de rotación de los datos
-//double factorEsc; //Factor de escalamiento para lograr un círculo
-//float xft,yft; //Valores filtrados
 
 bool cal_mag=0;
 bool cal_mpu=0;
@@ -200,8 +199,8 @@ RH_RF69 rf69(RFM69_CS, RFM69_INT); // Inicialización del driver de la bibliotec
 //Variables para el mensaje que se va a transmitir a la base
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN]; //Buffer para recibir mensajes.
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
-unsigned long tiempoRobotTDMA = 50; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
-unsigned long tiempoCicloTDMA = cantidadRobots * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
+const int tiempoRobotTDMA = 50; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
+const int tiempoCicloTDMA = cantidadRobots * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
 unsigned long timeStamp1; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene apenas se recibe el reloj.
 unsigned long timeStamp2; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene al guardar en memoria el reloj.
 unsigned long data; //Variable donde se almacenará el valor del reloj del máster.
@@ -327,13 +326,12 @@ void setup() {
 
   Serial.println("¡RFM69 radio en funcionamiento!");
   delay(20);
+  
+  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 }
 
 void loop(){
-
-  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
-
   //***POLLING*** Acciones que se ejecutan periodicamente. Más frecuentemente que la máquina de estados
   RecorrerObstaculos();
 
@@ -473,8 +471,7 @@ void leerMsgSTM ()  {
   }
 
   else if(tipoSensor==-1){ //Si llega tipoSensor==-1 significa que el interruptor está encendido, se va a usar para pedir calibración
-    //Serial.println("interruptor!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-    //Implementar llamado a calibración de sensores**********************************************************************************************************
+    calibrar();
   }
 
 }
@@ -863,10 +860,6 @@ void AsignarDireccionRWM(){ //Nuevo random walk con memoria para mejorar comport
       break;
   }
   
-  mensajeCreado = false;
-  CrearMensaje(suma, anguloGiro, 0, 0, datosSensores[ultimoObstaculo][2], datosSensores[ultimoObstaculo][5]);
-
-  
   //En esta condición especial se asigna una nueva dirección global, no debería tener que entrar a este ciclo, revisar si logra entrar
   if (obstaculoAdelante && adelante) { //Debe elegir nueva dirección global aleatoria diferente a la actual
     direccionGlobalAnterior=direccionGlobal;
@@ -905,7 +898,7 @@ int ControlPosGiroRueda( float posRef, float posActual, float& sumErrorGiro, flo
   //se actualiza el error integral y se restringe en un rango, para no aumentar sin control
   //como son variables que se mantienen en ciclos futuros, se usan variables globales
   sumErrorGiro += errorGiro * tiempoMuestreoS;
-  sumErrorGiro = constrain(sumErrorGiro, errorMinIntegral, errorMaxIntegral);
+  sumErrorGiro = constrain(sumErrorGiro, errorMinIntegralGiro, errorMaxIntegralGiro);
 
   //error derivativo (diferencial)
   float difErrorGiro = (errorGiro - errorAnteriorGiro) / tiempoMuestreoS;
@@ -1158,7 +1151,7 @@ int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, fl
   //se actualiza el error integral y se restringe en un rango, para no aumentar sin control
   //como son variables que se mantienen en ciclos futuros, se usan variables globales
   sumErrorVel += errorVel * tiempoMuestreoS; //Anteriormente se comportaba como producto de sumatoria cuando debía ser sumatoria de productos
-  sumErrorVel = constrain(sumErrorVel, errorMinIntegral, errorMaxIntegral);
+  sumErrorVel = constrain(sumErrorVel, errorMinIntegralVelocidad, errorMaxIntegralVelocidad);
 
   //error derivativo (diferencial)
   float difErrorVel = (errorVel - errorAnteriorVel) / tiempoMuestreoS / 10; //Se divide el factor derivativo entre 10 debido a la inestabilidad de la velocidad por falta de precisión en la medición
@@ -1195,7 +1188,7 @@ bool AvanzarDistancia(int distanciaDeseada) {
   
   float errorVelocidad = velActualDerecha - velActualIzquierda; //Error entre la velocidad de las dos ruedas
   float velSetPointDerecha = velSetPoint - errorVelocidad * correcionVelRuedas;
-  float velSetPointIzquierda = velSetPoint + errorVelocidad * correcionVelRuedas;
+  float velSetPointIzquierda = velSetPoint + errorVelocidad * 0.0;
 
   int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(velSetPointDerecha, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
   int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(velSetPointIzquierda, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
@@ -1739,9 +1732,12 @@ void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro
   Serial.println("Calibrando Magnetometro");
   short x2,y2,z2;
   float x1,y1,d;
-  medirMagnetCalibracion(x2,y2,z2);
+  float rawx[numSamples]; //Lista de datos crudos en x
+  float rawy[numSamples]; //Lista de datos crudos en y
+  
   //Toma las muestras con la función Giro() sobre una circunferencia completa
   while (!cal_mag){
+    medirMagnetCalibracion(x2,y2,z2);
     if(Giro(360)==false){
       if (puntosCalibracion==0){ //La variable i definirá la cantidad de datos que se tomen
           rawx[puntosCalibracion]=float(x2);
@@ -1809,7 +1805,7 @@ void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro
      guardarDatoFloat(angulo,8);
      guardarDatoFloat(factorEsc,12); 
      cal_mag=true;
-     Serial.println("Magnetometro calibrado");
+     //Serial.println("Magnetometro calibrado");
     } 
   }
 }
@@ -1823,8 +1819,8 @@ void Calibracion_MPU(){  //Funcion que mide datos del MPU en posición horizonta
     float acx_prom=0;
     float acy_prom=0;
     float acz_prom=0;
+    float gxx,gyy,gzz,axx,ayy,azz;
     for (int i=0;i<=100;i++){
-      float gxx,gyy,gzz,axx,ayy,azz;
       leeMPUCalibracion(gxx, gyy, gzz, axx, ayy, azz);
       acx_prom=acx_prom+axx;
       acy_prom=acy_prom+ayy;
@@ -1833,12 +1829,12 @@ void Calibracion_MPU(){  //Funcion que mide datos del MPU en posición horizonta
       gy_prom=gy_prom+gyy;
       gz_prom=gz_prom+gzz;
     }
-   gx_off=gx_off+(gx_prom/100);
-   gy_off=gy_off+(gy_prom/100);
-   gz_off=gz_off+(gz_prom/100);
-   acx_off=acx_off+(acx_prom/100);
-   acy_off=acy_off+(acy_prom/100);
-   acz_off=acz_off+(16384-(acz_prom/100));
+  gx_off=gx_off+(gx_prom/100);
+  gy_off=gy_off+(gy_prom/100);
+  gz_off=gz_off+(gz_prom/100);
+  acx_off=acx_off+(acx_prom/100);
+  acy_off=acy_off+(acy_prom/100);
+  acz_off=acz_off+(16384-(acz_prom/100));
   }
   //Guarda los datos en la EEPROM
   guardarDatoFloat(gx_off,16);
@@ -1847,11 +1843,23 @@ void Calibracion_MPU(){  //Funcion que mide datos del MPU en posición horizonta
   guardarDatoFloat(acx_off,28);
   guardarDatoFloat(acy_off,32);
   guardarDatoFloat(acz_off,36);
-  Serial.println("MPU calibrada");
+  //Serial.println("MPU calibrada");
   cal_mpu=true;
 }
 
+void calibrar(){
+  //Reducir velocidad del giro para darle tiempo al magnetómetro de obtener suficientes datos
+  limiteSuperiorCicloTrabajoGiro = limiteSuperiorCicloTrabajoGiroCalibracion;
+  limiteInferiorCicloTrabajoGiro = limiteInferiorCicloTrabajoGiroCalibracion;
+  if (!cal_mpu){
+    Calibracion_MPU();
+  }
 
+  if (!cal_mag){
+    Calibracion_Mag(); 
+  }
+  while(true){}//Detener ejecución para forzar reinicio despues de calibración
+}
 
 /////Cementerio de funciones, eliminar 6/24//////////////////////////////////////////////
 /*

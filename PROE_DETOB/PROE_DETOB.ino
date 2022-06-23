@@ -100,6 +100,7 @@ void setup() {
   myServo.write(movimientoMaximo/2); //Coloca el servo en el centro para confirmar alineación
   //myServo.writeMicroseconds(1500);
   delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
+  revisarInterruptor();
 }
  
 void loop() {
@@ -109,7 +110,6 @@ void loop() {
   revisarSensoresIR(); //Serial1.println("IR");
   revisarTemperatura(); //desactivado mientras no está soldado el sensor al PCB
   revisarBateria(); //Serial1.println("Bat");
-  revisarInterruptor();
   encenderLED(); //Serial1.println("LED"); //enciende un led si alguna función lo activó 
   actividad(); //Serial1.println("Actividad");//Parpadea led amarillo para confirmar actividad del stm
   
@@ -163,10 +163,10 @@ void revisarTemperatura(){ //Lectura del sensor de temperatura
 
 void revisarBateria(){ //Revisar la batería cada 20 ciclos del loop, codigo 6
   if(!digitalRead(lowBattery)){ //Batería baja = pin bajo
-    digitalWrite(led1,HIGH); //Encender led rojo si la batería está baja
     cuentaBateria++;
     if(cuentaBateria>=10000){ //Si la bateria esta baja enviar advertencia cada 10000 ciclos del loop principal
-      //crearMensaje(6,0,90);
+      crearMensaje(6,0,90);
+      digitalWrite(led1,HIGH); //Encender led rojo si la batería está baja
       ledON=true;
       onTime=300;
       cuentaBateria=0;
@@ -255,7 +255,7 @@ void crearMensaje(int caso, int distancia, int angulo){ //Prepara el paquete de 
 
 void responderFeather(){ 
   if (nuevoObstaculo){ //Evita enviar el mismo obstaculo dos veces
-    Wire.write(dato);                    //Envia el valor al esclavo
+    Wire.write(dato);  //Envia el valor al master
     nuevoObstaculo = false;
   }else{
     Wire.write(""); 

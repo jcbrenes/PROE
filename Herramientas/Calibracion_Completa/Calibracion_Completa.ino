@@ -114,8 +114,6 @@ int anguloGiro = 0;
 const int numSamples=700;
 const double alfa=0.2;
 const int desfase=(1-alfa)*20;
-float rawx[numSamples]; //Lista de datos crudos en x
-float rawy[numSamples]; //Lista de datos crudos en y
 int j,i,k,l=0; //Contadores
 float maxX,minX,maxY,minY; // Maximos y minimos de los datos
 float xoff,yoff; //Guarda los offsets de los set de datos
@@ -172,9 +170,11 @@ void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro
   Serial.println("Calibrando Magnetometro");
   short x2,y2,z2;
   float x1,y1,d;
-  medirMagnet(x2,y2,z2);
+  float rawx[numSamples]; //Lista de datos crudos en x
+  float rawy[numSamples]; //Lista de datos crudos en y
   //Toma las muestras con la función Giro() sobre una circunferencia completa
   while (!cal_mag){
+    medirMagnet(x2,y2,z2);
     if(Giro(360)==false){
       if (i==0){ //La variable i definirá la cantidad de datos que se tomen
           rawx[i]=float(x2);
@@ -196,7 +196,6 @@ void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro
       //Etapa de filtrado, se utiliza el filtro de "Media movil"
      else{
        Serial.println("Procesando datos...");
-       delay(300); 
        //Filtrado de datos
        for (int s=0;s<=i;s++){
         float crudox=rawx[s];
@@ -209,10 +208,8 @@ void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro
         }
       }
       //Calcula los maximos y mínimos
-      maxX=maxF(rawx);
-      minX=minF(rawx);
-      maxY=maxF(rawy);
-      minY=minF(rawy);
+      maxMin(rawx, maxX, minX);
+      maxMin(rawy, maxY, minY);
       //Calcula los offset del elipsoide y los sustrae
       xoff=(maxX+minX)/2;
       yoff=(maxY+minY)/2;
@@ -697,31 +694,16 @@ void medirMagnet(short &x,short &y,short &z){
   }
 }
 
-float maxF(float arrayData[]){
-  float dato=0.0;
-  float maxV=arrayData[0];
-  for(int p=0;p<=i;p=p+1){
-    dato=arrayData[p];
-    if (dato>maxV){
-      maxV=dato;
+void maxMin(float arrayData[], float &maxV, float &minV){
+  for(int m=1; m<= i; m++){
+    if(arrayData[m]> maxV){
+      maxV=arrayData[m];
+    }
+    if(arrayData[m]< minV){
+      minV=arrayData[m];
     }
   }
-  return maxV; 
 }
-
-float minF(float arrayData[]){
-  float dato=0;
-  float minV=arrayData[0];
-  for(int m=1;m<=i;m=m+1){
-    dato=arrayData[m];
-    if (dato<minV){
-      minV=dato; 
-    }
-  }
-  return minV; 
-}
-
-
 
 
 void guardarDatoFloat(float dato,int dirPagInicial){
