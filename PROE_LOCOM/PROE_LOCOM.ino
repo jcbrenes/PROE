@@ -9,7 +9,7 @@
 
 //Variables del enjambre para la comunicación a la base
 uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+unsigned long idRobot = 3; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 //constantes del robot empleado
 const int tiempoMuestreo=100000; //unidades: micro segundos
@@ -190,6 +190,7 @@ bool cal_mpu=0;
 #define RF69_FREQ      915.0   //La frecuencia debe ser la misma que la de los demas nodos.
 #define DEST_ADDRESS   10      //No sé si esto es totalmente necesario, creo que no porque nunca usé direcciones.
 #define MY_ADDRESS     idRobot //Dirección de este nodo. La base la usa para enviar el reloj al inicio
+
 //Definición de pines. Creo que no todos se están usando, me parece que el LED no.
 #define RFM69_CS       8
 #define RFM69_INT      3
@@ -332,6 +333,10 @@ void setup() {
 }
 
 void loop(){
+
+  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+
   //***POLLING*** Acciones que se ejecutan periodicamente. Más frecuentemente que la máquina de estados
   RecorrerObstaculos();
 
@@ -1515,6 +1520,7 @@ inline bool RTCisSyncing() {
 
 void sincronizacion() {
   while (!timeReceived) { //Espera mensaje de sincronización de la base
+
     if (rf69.available()){                                                        // Espera a recibir un mensaje
       uint8_t len = sizeof(buf);                                                  //Obtengo la longitud máxima del mensaje a recibir
       timeStamp1 = RTC->MODE0.COUNT.reg;
@@ -1527,7 +1533,6 @@ void sincronizacion() {
         RTC->MODE0.COUNT.reg = masterClock;                                       //Seteo el RTC del nodo al tiempo del master.
         RTC->MODE0.COMP[0].reg = masterClock + idRobot * tiempoRobotTDMA + 50;    //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
         while (RTCisSyncing());                                                   //Espero la sincronización.
-  
         timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
         //Wire.onReceive(RecibirI2C);
       }
@@ -1552,11 +1557,11 @@ void configureClock() {
   GCLK->GENDIV.reg = GCLK_GENDIV_ID(2) | GCLK_GENDIV_DIV(4);
   while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
 
-#ifdef CRYSTALLESS
-  GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_OSCULP32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
-#else
-  GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_XOSC32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
-#endif
+  #ifdef CRYSTALLESS
+    GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_OSCULP32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
+  #else
+    GCLK->GENCTRL.reg = (GCLK_GENCTRL_GENEN | GCLK_GENCTRL_SRC_XOSC32K | GCLK_GENCTRL_ID(2) | GCLK_GENCTRL_DIVSEL );
+  #endif
 
   while (GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY);
   GCLK->CLKCTRL.reg = (uint32_t)((GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK2 | (RTC_GCLK_ID << GCLK_CLKCTRL_ID_Pos)));

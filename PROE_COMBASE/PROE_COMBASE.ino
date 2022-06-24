@@ -7,7 +7,7 @@
 
 /************ Radio Setup ***************/
 #define RF69_FREQ 915.0   // Frecuencias deben ser iguales con respecto a los demás nodos
-#define MY_ADDRESS     1  // Dirección del receptor (base). No sé si es necesaria.
+#define MY_ADDRESS     0  // Dirección del receptor (base). No sé si es necesaria.
 // Definiciones de pines.
 #define RFM69_CS      8
 #define RFM69_INT     3
@@ -54,7 +54,6 @@ void setup()
   rf69.setTxPower(20, true);   //Rango de 14-20 para la potencia, segundo argumento debe ser verdadero para el 69HCW.
   // Configurar aL NODO para que escuche cualquier dirección (esto sí es necesario).
 
-  
   // The encryption key has to be the same as the one in the server
   uint8_t key[] = { 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
                     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
@@ -62,7 +61,7 @@ void setup()
 
   Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
 
-  // Declaración de variables
+  /***** Envío del clock *****/
   unsigned long timeStamp1 = RTC->MODE0.COUNT.reg; //Extraer tiempo del RTC de la base
   uint8_t reloj[4];
   uint32_t* ptrReloj;  
@@ -71,6 +70,7 @@ void setup()
   for(uint8_t i = 0; i < 4; i++){
     reloj[i] = *ptrReloj >> i*8;  //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
   }
+
   rf69_manager.sendto(reloj, sizeof(reloj), RH_BROADCAST_ADDRESS);     //Enviar valor del RTC al esclavo
   rf69_manager.waitPacketSent();
   //Esta función envia un solo mensaje y asume que todos los esclavos la reciben al mismo tiempo en la misma dirección
