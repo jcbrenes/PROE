@@ -51,7 +51,7 @@
 %adelante en Vision_Validacion.m
 
 cont=1;
-numImages = 10; %Cantidad de imagenes aceptadas para calibración
+numImages = 7; %Cantidad de imagenes aceptadas para calibración
 CantidadEjemplosCaptura=1;%Variable para modificar la cantidad de ejemplos que se almacenan en los resultados
 squareSize = 40; % Tamaño del lado del cuadro en el patrón de calibración, en mm
 tamanoCuadroMedicion=15; %aun no se encuentra por qué 15
@@ -64,7 +64,7 @@ tamanoCuadroMedicion=15; %aun no se encuentra por qué 15
 %que se trabaje.
 
 %Dirección Kevin
-extensionImCalibracion='C:\Users\Kevin Morales\Documents\GitHub\PROE\Herramientas\Cámara\';
+extensionImCalibracion='C:\Users\Dell\Desktop\ARCHIVOS\Proyectos\PROE\PROE\Herramientas\Cámara\';
 
 %Dirección Cindy
 %extensionImCalibracion='C:\Users\ccalderon\OneDrive - TEC\GitHub\PROE\Herramientas\Cámara\';

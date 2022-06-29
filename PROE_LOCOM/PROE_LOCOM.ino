@@ -93,7 +93,7 @@ TwoWire segundoI2C(&sercom1, 11, 13);
 
 //Variables para la máquina de estados principal
 enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, CONTROL_POSE, NADA};
-char *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "CONTROL_POSE", "NADA"};
+//char *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "CONTROL_POSE", "NADA"};
 PosiblesEstados estado = AVANCE;
 
 //variable que almacena el tiempo del último ciclo de muestreo
