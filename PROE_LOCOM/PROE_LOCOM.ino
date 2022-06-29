@@ -33,6 +33,11 @@ const float KpGiro=5.0; //constante control proporcional
 const float KiGiro=20.0 * tiempoMuestreoS;//constante control integral
 const float KdGiro=0.08 / tiempoMuestreoS; //constante control derivativo
 
+//constantes para control PD de la pose del robot 
+const float KpPose=1; //constante control proporcional
+const float KdPose=0.0 / tiempoMuestreoS; //constante control derivativo
+const float velBase=120.0; //unidades mm/s
+
 //Constantes para la implementación del control PID real
 const int errorMinIntegral=-250;
 const int errorMaxIntegral=250;
@@ -87,8 +92,8 @@ TwoWire segundoI2C(&sercom1, 11, 13);
 //VARIABLES GLOBALES
 
 //Variables para la máquina de estados principal
-enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, NADA};
-char *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
+enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, CONTROL_POSE, NADA};
+char *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "CONTROL_POSE", "NADA"};
 PosiblesEstados estado = AVANCE;
 
 //variable que almacena el tiempo del último ciclo de muestreo
@@ -122,6 +127,13 @@ float errorAnteriorVelDer = 0;
 float errorAnteriorVelIzq = 0;
 float sumErrorVelDer = 0;
 float sumErrorVelIzq = 0;
+//Para Coordenadas
+float errorAnteriorOrientacion = 0;
+float distLinealRuedaDerecha = 0;
+float distLinealRuedaIzquierda = 0;
+float distLinealRuedaDerechaAnterior = 0;
+float distLinealRuedaIzquierdaAnterior = 0;
+bool finPose = false;
 
 //Variables para las interrupciones de los encoders
 byte estadoEncoderDer = 1;
@@ -138,6 +150,7 @@ unsigned long tiempoSTM = 0; //Almacena el tiempo de muestreo del STM
 //Variables para el algoritmo de exploración
 int distanciaAvanzada = 0;
 int poseActual[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación.
+float poseActualF[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación (grados).
 bool giroTerminado = 1; //Se hace esta variable global para saber cuando se está en un giro y cuando no
 bool obstaculoAdelante = false;
 bool obstaculoDerecha = false;
@@ -322,7 +335,8 @@ void loop(){
   //***MAQUINA DE ESTADOS*** Donde se manejan los comportamientos del robot y el control PID
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
   if((micros()-tiempoMaquinaEstados)>=tiempoMuestreo){
-     tiempoMaquinaEstados=micros();
+     Serial.print(micros());
+     tiempoMaquinaEstados=tiempoMuestreo;
      tiempoActual=millis();//tomo el tiempo actual (para reducir las llamadas a millis)
 
      //Polling de perifericos conectados a los buses I2C
@@ -331,7 +345,11 @@ void loop(){
      detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
      leeMPU(anguloMPU,velMPU); //medición del MPU
      
+     //descomentar la siguiente linea si se quiere llevar el robot a cierta coordenada
+     estado = CONTROL_POSE;
+     
      //Máquina de estados que cambia el modo de operación
+     Serial.println(estado);
      switch (estado) {
   
         case AVANCE:  { 
@@ -407,7 +425,23 @@ void loop(){
             estado=AVANCE;
           }
         }
+
+        case CONTROL_POSE: {
+          Serial.println("---------------------------------");
+          finPose = AvanzarCoordenada(1000, 1800, 50); //coordenada x, coordenada y, error permitido, todo en mm
+          Serial.println(finPose);
+          Serial.println("---------------------------------");
+          if(finPose){
+            digitalWrite(AIN1, LOW);
+            digitalWrite(AIN2, LOW);
+            digitalWrite(BIN1, LOW);
+            digitalWrite(BIN2, LOW);
+            estado=NADA;
+          }
+        }
+        
         case NADA: {
+          Serial.println("Nada");
           break;
         }
     }
@@ -578,7 +612,7 @@ void ActualizarUbicacionReal() {
 void DeteccionObstaculo(){
 //Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
 //Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
-
+  /*
   if(estado!=RETROCEDA && giroTerminado==1 && tiempoActual>2000){
     //Solo si el estado ya no es retroceder.  También que no está haciendo un giro 
     //y para que ignore las interrupciones los primeros segundos al encenderlo
@@ -586,7 +620,8 @@ void DeteccionObstaculo(){
     ActualizarUbicacionReal(); //Como se interrumpió un movimiento, actualiza la ubicación actual
     ConfiguracionParar(); //Se detiene un momento y reset de encoders 
     tiempoRetroceso= tiempoActual; //Almacena el ultimo tiempo para usarlo en el temporizador
-  }   
+  }  
+  */ 
 }
 
 
@@ -978,8 +1013,8 @@ float calculaDistanciaLinealRecorrida() {
   //Función que realiza el cálculo de la distancia lineal recorrida por cada rueda
   //Devuelve el promedio de las distancias
 
-  float distLinealRuedaDerecha = (float)contPulsosDerecha / pulsosPorMilimetro;
-  float distLinealRuedaIzquierda = - (float)contPulsosIzquierda / pulsosPorMilimetro;
+  distLinealRuedaDerecha = (float)contPulsosDerecha / pulsosPorMilimetro;
+  distLinealRuedaIzquierda = - (float)contPulsosIzquierda / pulsosPorMilimetro;
   float DistanciaLineal = (distLinealRuedaDerecha + distLinealRuedaIzquierda) / 2.0;
 
   return DistanciaLineal;
@@ -1014,7 +1049,8 @@ int ControlVelocidadRueda( float velRef, float velActual, float& sumErrorVel, fl
 
   //actualiza el valor del error para el siguiente ciclo
   errorAnteriorVel = errorVel;
-
+  Serial.println("ValorPWM: ");
+  Serial.println((int)pidTermVel);
   return  ((int)pidTermVel);
 }
 
@@ -1035,9 +1071,17 @@ bool AvanzarDistancia(int distanciaDeseada) {
   int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(velSetPoint, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
    
   ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
-
+  Serial.println(velSetPoint);
+  Serial.println("VelocidadDer: ");
+  Serial.println(velActualDerecha);
+  Serial.println("VelocidadIzq: ");
+  Serial.println(velActualIzquierda);
+  
+  
   float distanciaAvanzada= calculaDistanciaLinealRecorrida();
 
+  Serial.println(distanciaAvanzada);
+  
   bool avanceListo = false; 
   if (abs(distanciaAvanzada) >= abs(distanciaDeseada)) {
     avanceListo = true; 
@@ -1061,7 +1105,80 @@ void AvanzarIndefinido() {
 
 }
 
+bool AvanzarCoordenada(int coordenadaXDeseada, int coordenadaYDeseada, float errorPermitido) {
+  //Desplazamiento hasta una coordenada deseada
+  //Devuelve true cuando alcanzó la coordenada deseada
 
+  
+  velActualDerecha= calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
+  velActualIzquierda= -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
+  calculaDistanciaLinealRecorrida(); //Se actualizan las distancias recorridas por cada rueda en mm
+  float avanceRealizado = ((distLinealRuedaDerecha-distLinealRuedaDerechaAnterior)+(distLinealRuedaIzquierda-distLinealRuedaIzquierdaAnterior))/2;
+  float avanceRealizadoResta = ((distLinealRuedaDerecha-distLinealRuedaDerechaAnterior)-(distLinealRuedaIzquierda-distLinealRuedaIzquierdaAnterior));
+  Serial.print("distLinealRuedaDerecha: ");
+  Serial.println(distLinealRuedaDerecha);
+  Serial.print("distLinealRuedaIzquierda: ");
+  Serial.println(distLinealRuedaIzquierda);
+  Serial.print("avanceRealizado: ");
+  Serial.println(avanceRealizado);
+  orientacion = avanceRealizadoResta/(distanciaCentroARueda*2); //Calculo de orientacion (radianes) por odometria
+  orientacion = orientacion * (180 / PI); //Se convierte a grados
+  poseActualF[2] = poseActualF[2] + orientacion;
+
+  
+  
+  //Calcular nueva posición basado en el cambio de las ruedas
+  poseActualF[0] = poseActualF[0] + (avanceRealizado * cos(poseActualF[2]*(PI/ 180))); //coordenada X
+  poseActualF[1] = poseActualF[1] + (avanceRealizado * sin(poseActualF[2]*(PI/ 180))); //coordenada Y
+
+  float errorCoordenadaX = coordenadaXDeseada - poseActualF[0];
+  float errorCoordenadaY = coordenadaYDeseada - poseActualF[1];
+  float errorOrientacion = (atan2(errorCoordenadaY,errorCoordenadaX)*(180/ PI)) - poseActualF[2]; //Respuesta en grados 
+
+  Serial.print("errorCoordenadaX: ");
+  Serial.println(poseActualF[0]);
+  Serial.print("errorCoordenadaY: ");
+  Serial.println(poseActualF[1]);
+  Serial.print("errorOrientacion: ");
+  Serial.println(errorOrientacion);
+
+  float controlProporcional = KpPose * errorOrientacion;
+  float controlDerivativo = KdPose * (errorAnteriorOrientacion-errorOrientacion);
+
+  float controlPose = controlProporcional + controlDerivativo;
+
+  float nuevaVelocidadRuedaDerecha = velBase + controlPose;
+  float nuevaVelocidadRuedaIzquierda = velBase - controlPose;
+
+  Serial.print("VelocidadRuedaDerecha: ");
+  Serial.println(nuevaVelocidadRuedaDerecha);
+  Serial.print("VelocidadRuedaIzquierda: ");
+  Serial.println(nuevaVelocidadRuedaIzquierda);
+
+  int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(nuevaVelocidadRuedaDerecha, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
+  int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(nuevaVelocidadRuedaIzquierda, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
+
+  Serial.print("VelocidadRuedaDerecha: ");
+  Serial.println(velActualDerecha);
+  Serial.print("VelocidadRuedaIzquierda: ");
+  Serial.println(velActualIzquierda);
+   
+  ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
+
+  bool finMovimiento = false;
+  float errorPose = sqrt(pow(errorCoordenadaX,2)+pow(errorCoordenadaY,2));
+  Serial.print("errorPose: ");
+  Serial.println(errorPose);
+  if ( errorPose <= errorPermitido) {
+    finMovimiento = true; 
+  }
+
+  distLinealRuedaDerechaAnterior = distLinealRuedaDerecha;
+  distLinealRuedaIzquierdaAnterior = distLinealRuedaIzquierda;
+  errorAnteriorOrientacion = errorOrientacion;
+  
+  return finMovimiento;
+}
 
 
 //*****Funciones para manejar la orientación*********
