@@ -33,6 +33,12 @@ const float KpGiro=3.0; //constante control proporcional
 const float KiGiro=1.1;//constante control integral
 const float KdGiro=0.17; //constante control derivativo
 
+//constantes para control PID de la pose del robot 
+const float KpPose=1; //constante control proporcional
+const float KdPose=0.0; //constante control derivativo
+const float KiPose=1.0; //constante control derivativo
+const float velBase=120.0; //unidades mm/s
+
 //Constantes para la implementación del control PID real
 const int errorMinIntegralVelocidad=-255;
 const int errorMaxIntegralVelocidad=255;
@@ -92,7 +98,7 @@ TwoWire segundoI2C(&sercom1, 11, 13);
 //VARIABLES GLOBALES
 
 //Variables para la máquina de estados principal
-enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, NADA};
+enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER_DIRECCION, GIRO, CONTROL_POSE, NADA};
 //char const *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
 PosiblesEstados estado = AVANCE;
 
@@ -129,6 +135,16 @@ float errorAnteriorVelIzq = 0;
 float sumErrorVelDer = 0;
 float sumErrorVelIzq = 0;
 
+//Para Coordenadas
+float errorAnteriorOrientacion = 0;
+float sumErrorOrientacion = 0;
+float distLinealRuedaDerecha = 0;
+float distLinealRuedaIzquierda = 0;
+float distLinealRuedaDerechaAnterior = 0;
+float distLinealRuedaIzquierdaAnterior = 0;
+bool finPose = false;
+bool corregirOrientacion = false;
+
 //Variables para las interrupciones de los encoders
 byte estadoEncoderDer = 1;
 byte estadoEncoderIzq = 1;
@@ -146,6 +162,7 @@ bool resetObstaculos=false; //Bandera que permite reiniciar los obstaculos detec
 //Variables para el algoritmo de exploración
 int distanciaAvanzada = 0;
 int poseActual[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación.
+float poseActualF[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación (grados).
 bool giroTerminado = 1; //Se hace esta variable global para saber cuando se está en un giro y cuando no
 bool obstaculoAdelante = false;
 bool obstaculoDerecha = false;
@@ -329,13 +346,15 @@ void setup() {
   delay(20);
   
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+
+  //descomentar la siguiente linea si se quiere llevar el robot a cierta coordenada
+  //estado = CONTROL_POSE;
+    
 }
 
 void loop(){
 
-  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 
   //***POLLING*** Acciones que se ejecutan periodicamente. Más frecuentemente que la máquina de estados
   RecorrerObstaculos();
@@ -412,6 +431,7 @@ void loop(){
         }
         
         estado= GIRO;
+        break;
       }
 
       case GIRO: {
@@ -427,7 +447,37 @@ void loop(){
           //Serial.print("Giro real: "); Serial.println(angActualRobot);
           estado=AVANCE;
         }
+        break;
       }
+
+      case CONTROL_POSE: {
+        if (!corregirOrientacion){
+          if (!finPose){
+            Serial.println("---------------------------------");
+            finPose = AvanzarCoordenada(900, 900, 10); //coordenada x, coordenada y, error permitido, todo en mm
+            Serial.println(finPose);
+            Serial.println("---------------------------------");
+            break;
+          }
+          else {
+            ConfiguracionParar();
+            corregirOrientacion = true;
+          }
+        }
+
+        else{
+          float orientacionDeseada = 135; //si se desea controlar la orientacion usar esta linea y comentar la siguiente
+          //float orientacionDeseada = poseActualF[2]; //si no se desea controlar orientacion descomentar esta linea
+          giroTerminado= Giro(orientacionDeseada - poseActualF[2]);
+          if   (giroTerminado) {
+            ConfiguracionParar();
+            finPose = false;
+            corregirOrientacion = false;
+            estado = NADA;
+          }
+        }
+         break;
+        }
 
       case NADA: {
         break;
@@ -1138,8 +1188,8 @@ float calculaDistanciaLinealRecorrida() {
   //Función que realiza el cálculo de la distancia lineal recorrida por cada rueda
   //Devuelve el promedio de las distancias
 
-  float distLinealRuedaDerecha = (float)contPulsosDerecha / pulsosPorMilimetro;
-  float distLinealRuedaIzquierda = - (float)contPulsosIzquierda / pulsosPorMilimetro;
+  distLinealRuedaDerecha = (float)contPulsosDerecha / pulsosPorMilimetro;
+  distLinealRuedaIzquierda = - (float)contPulsosIzquierda / pulsosPorMilimetro;
   float DistanciaLineal = (distLinealRuedaDerecha + distLinealRuedaIzquierda) / 2.0;
 
   return DistanciaLineal;
@@ -1227,6 +1277,86 @@ void AvanzarIndefinido() {
 
   ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
 
+}
+
+bool AvanzarCoordenada(int coordenadaXDeseada, int coordenadaYDeseada, float errorPermitido) {
+  //Desplazamiento hasta una coordenada deseada
+  //Devuelve true cuando alcanzó la coordenada deseada
+
+  float errorCoordenadaX = coordenadaXDeseada - poseActualF[0];
+  float errorCoordenadaY = coordenadaYDeseada - poseActualF[1];
+  float errorOrientacion = (atan2(errorCoordenadaY,errorCoordenadaX)*(180/ PI)) - poseActualF[2]; //Respuesta en grados
+
+  bool finMovimiento = false;
+  float errorPose = sqrt(pow(errorCoordenadaX,2)+pow(errorCoordenadaY,2));
+  Serial.print("errorPose: ");
+  Serial.println(errorPose);
+  if (errorPose <= errorPermitido) {
+    finMovimiento = true;
+    return finMovimiento;
+  }
+
+  
+  velActualDerecha= calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
+  velActualIzquierda= -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
+  calculaDistanciaLinealRecorrida(); //Se actualizan las distancias recorridas por cada rueda en mm
+  float avanceRealizado = ((distLinealRuedaDerecha-distLinealRuedaDerechaAnterior)+(distLinealRuedaIzquierda-distLinealRuedaIzquierdaAnterior))/2;
+  float avanceRealizadoResta = ((distLinealRuedaDerecha-distLinealRuedaDerechaAnterior)-(distLinealRuedaIzquierda-distLinealRuedaIzquierdaAnterior));
+  Serial.print("distLinealRuedaDerecha: ");
+  Serial.println(distLinealRuedaDerecha);
+  Serial.print("distLinealRuedaIzquierda: ");
+  Serial.println(distLinealRuedaIzquierda);
+  Serial.print("avanceRealizado: ");
+  Serial.println(avanceRealizado);
+  orientacion = avanceRealizadoResta/(distanciaCentroARueda*2); //Calculo de orientacion (radianes) por odometria
+  orientacion = orientacion * (180 / PI); //Se convierte a grados
+  poseActualF[2] = poseActualF[2] + orientacion;
+
+  
+  //Calcular nueva posición basado en el cambio de las ruedas
+  poseActualF[0] = poseActualF[0] + (avanceRealizado * cos(poseActualF[2]*(PI/ 180))); //coordenada X
+  poseActualF[1] = poseActualF[1] + (avanceRealizado * sin(poseActualF[2]*(PI/ 180))); //coordenada Y
+
+
+  Serial.print("errorCoordenadaX: ");
+  Serial.println(poseActualF[0]);
+  Serial.print("errorCoordenadaY: ");
+  Serial.println(poseActualF[1]);
+  Serial.print("errorOrientacion: ");
+  Serial.println(errorOrientacion);
+
+  float controlProporcional = KpPose * errorOrientacion;
+  float controlDerivativo = KdPose * (errorAnteriorOrientacion-errorOrientacion);
+
+  float controlPose = controlProporcional + controlDerivativo;
+
+  float nuevaVelocidadRuedaDerecha = velBase + controlPose;
+  float nuevaVelocidadRuedaIzquierda = velBase - controlPose;
+
+  Serial.print("VelocidadRuedaDerecha: ");
+  Serial.println(nuevaVelocidadRuedaDerecha);
+  Serial.print("VelocidadRuedaIzquierda: ");
+  Serial.println(nuevaVelocidadRuedaIzquierda);
+
+  int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(nuevaVelocidadRuedaDerecha, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
+  int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(nuevaVelocidadRuedaIzquierda, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
+
+  Serial.print("VelocidadRuedaDerecha: ");
+  Serial.println(velActualDerecha);
+  Serial.print("VelocidadRuedaIzquierda: ");
+  Serial.println(velActualIzquierda);
+   
+  ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
+
+  distLinealRuedaDerechaAnterior = distLinealRuedaDerecha;
+  distLinealRuedaIzquierdaAnterior = distLinealRuedaIzquierda;
+  errorAnteriorOrientacion = errorOrientacion;
+
+  poseActual[0] = round(poseActualF[0]);
+  poseActual[1] = round(poseActualF[1]);
+  poseActual[2] = round(poseActualF[2]);
+  
+  return finMovimiento;
 }
 
 
@@ -1874,50 +2004,40 @@ void revisaEncoders(){
   LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha); //Revisa los encoders rueda izquierda
   LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda); //Revisa los encoders rueda derecha
 }
-
 void PulsosRuedaDerechaC1(){
 //Manejo de interrupción del canal C1 del encoder de la rueda derecha
   //LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
   LecturaEncoder2(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
-
 }
-
 void PulsosRuedaDerechaC2() {
   //Manejo de interrupción del canal C2 del encoder de la rueda derecha
   //LecturaEncoder(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
   LecturaEncoder2(ENC_DER_C1, ENC_DER_C2, estadoEncoderDer, contPulsosDerecha);
 }
-
 void PulsosRuedaIzquierdaC1() {
   //Manejo de interrupción del canal C1 del encoder de la rueda izquierda
   //LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
   LecturaEncoder2(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
 }
-
 void PulsosRuedaIzquierdaC2() {
   //Manejo de interrupción del canal C2 del encoder de la rueda izquierda
   //LecturaEncoder(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
   LecturaEncoder2(ENC_IZQ_C1, ENC_IZQ_C2, estadoEncoderIzq, contPulsosIzquierda);
 }
-
 void LecturaEncoder(int entradaA, int entradaB, byte& state, int& contGiro) {
   //Función que determina si el motor está avanzando o retrocediendo en función del estado de las salidas del encoder y el estado anterior
   //Modifica la variable contadora de pulsos de ese motor
   //Funciona si se están revisando las 2 salidas de cada encoder (factor 4)
-
   //se almacena el valor actual del estado
   byte statePrev = state;
-
   //lectura de los encoders
   int A = digitalRead(entradaA);
   int B = digitalRead(entradaB);
-
   //se define el nuevo estado
   if ((A == HIGH) && (B == HIGH)) state = 1;
   if ((A == HIGH) && (B == LOW)) state = 2;
   if ((A == LOW) && (B == LOW)) state = 3;
   if ((A == LOW) && (B == HIGH)) state = 4;
-
   //Se aumenta o decrementa el contador de giro en base al estado actual y el anterior
   switch (state)
   {
@@ -1946,25 +2066,20 @@ void LecturaEncoder(int entradaA, int entradaB, byte& state, int& contGiro) {
       }
   }
 }
-
 void LecturaEncoder2(int entradaA, int entradaB, byte& state, int& contGiro) { //Funcion de lectura de encoders con un solo interrupt en C2
   //Función que determina si el motor está avanzando o retrocediendo en función del estado de las salidas del encoder y el estado anterior
   //Modifica la variable contadora de pulsos de ese motor
   //Funciona si se están revisando solo 1 salida de cada encoder (factor 2)
-
   //se almacena el valor actual del estado
   byte statePrev = state;
-
   //lectura de los encoders
   int A = digitalRead(entradaA); //C1
   int B = digitalRead(entradaB); //C2
-
   //se define el nuevo estado
   if ((A == HIGH) && (B == HIGH)) state = 1;
   if ((A == HIGH) && (B == LOW)) state = 2;
   if ((A == LOW) && (B == LOW)) state = 3;
   if ((A == LOW) && (B == HIGH)) state = 4;
-
   //Se aumenta o decrementa el contador de giro en base al estado actual y el anterior
   switch (state)
   {
@@ -1993,36 +2108,24 @@ void LecturaEncoder2(int entradaA, int entradaB, byte& state, int& contGiro) { /
       }
   }
 }
-
-
 void PulsosRuedaIzquierdaC2() {
   //Manejo de interrupción del canal C2 del encoder de la rueda izquierda
-
   byte statePrev = estadoEncoderIzq;
-
   //lectura de los encoders
   bool A = PORT->Group[PORTB].IN.reg & PORT_PB09;
   bool B = PORT->Group[PORTA].IN.reg & PORT_PA04;
-
   estadoEncoderIzq = (10*A) + (1*B);
-
   switchEncoder(estadoEncoderIzq, statePrev, contPulsosIzquierda);
 }
-
 void PulsosRuedaDerechaC2() {
   //Manejo de interrupción del canal C2 del encoder de la rueda derecha
-
   byte statePrev = estadoEncoderDer;
-
   //lectura de los encoders
   bool A = PORT->Group[PORTA].IN.reg & PORT_PA02;
   bool B = PORT->Group[PORTB].IN.reg & PORT_PB08;
-
   estadoEncoderDer = (10*A) + (1*B);
-
   switchEncoder(estadoEncoderDer, statePrev, contPulsosDerecha);
 }
-
 void switchEncoder(byte &state, byte &statePrev, int &contPulsos){
   //Se aumenta o decrementa el contador de giro en base al estado actual y el anterior
   switch (state)
@@ -2052,26 +2155,19 @@ void switchEncoder(byte &state, byte &statePrev, int &contPulsos){
       }
   }
 }
-
-
-
 void LecturaEncoderIzq(byte& state, int& contGiro) { //Funcion de lectura de encoders con un solo interrupt en C2
   //Función que determina si el motor está avanzando o retrocediendo en función del estado de las salidas del encoder y el estado anterior
   //Modifica la variable contadora de pulsos de ese motor
   //Funciona si se están revisando solo 1 salida de cada encoder (factor 2)
   //Revisa los puertos directamente
-
   //se almacena el valor actual del estado
   byte statePrev = state;
-
   //lectura de los encoders
   bool A = PORT->Group[PORTB].IN.reg & PORT_PB09;
   bool B = PORT->Group[PORTA].IN.reg & PORT_PA04;
   //bool A = (PORT->Group[g_APinDescription[entradaA].ulPort].IN.reg & (1ul << g_APinDescription[entradaA].ulPin));
   //bool B = (PORT->Group[g_APinDescription[entradaB].ulPort].IN.reg & (1ul << g_APinDescription[entradaB].ulPin));
-
   state = (10*A) + (1*B);
-
   //Se aumenta o decrementa el contador de giro en base al estado actual y el anterior
   switch (state)
   {
