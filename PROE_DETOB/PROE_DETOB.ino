@@ -88,7 +88,7 @@ void setup() {
   pinMode(sharp, INPUT);
 
   digitalWrite(int1,LOW); //Que el pin de int esté en bajo
-  delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
+  delay(100); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
 
   //Configuración de perifericos//
   Wire.begin(8);           //Inicia comunicación i2c como master
@@ -96,11 +96,11 @@ void setup() {
   Serial1.begin(115200);  //Inicia la comunicación serial a 115200 baud
   Serial1.println("On");  //Enviar un "on" por el serial para confirmar que el setup se ejecutó correctamente
 
-
-  myServo.write(movimientoMaximo/2); //Coloca el servo en el centro para confirmar alineación
+  servoPos = movimientoMaximo/2;
+  myServo.write(servoPos); //Coloca el servo en el centro para confirmar alineación
   //myServo.writeMicroseconds(1500);
-  delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
   revisarInterruptor();
+  delay(100); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
 }
  
 void loop() {
