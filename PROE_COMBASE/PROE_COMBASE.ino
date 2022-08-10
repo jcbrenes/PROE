@@ -98,7 +98,9 @@ void loop() {
     }
     serialPrint(from);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
     serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
-    serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrintln(angulo);
+    serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrint(angulo);
+
+    serialPrint("[RSSI ");serialPrint(rf69.lastRssi());serialPrintln("]");
   }
   
   actividad();
