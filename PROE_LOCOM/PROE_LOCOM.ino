@@ -9,7 +9,7 @@
 #include <RHDatagram.h> // Biblioteca para la comunicación con direcciones
 
 /************ Serial Setup ***************/
-#define debug 1
+#define debug 0
 
 #if debug == 1
 #define serialPrint(x) Serial.print(x)
@@ -21,7 +21,7 @@
 
 //Variables del enjambre para la comunicación a la base
 uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 //constantes del robot empleado
 const int tiempoMuestreo=100000; //unidades: micro segundos
@@ -363,7 +363,7 @@ void setup() {
   delay(20);
   
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
-  //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 
   //descomentar la siguiente linea si se quiere llevar el robot a cierta coordenada
   //estado = CONTROL_POSE;
@@ -722,54 +722,6 @@ void RevisaObstaculoPeriferia() {
       }
       if (datosSensores[i][5] > -95 && datosSensores[i][5] < -55) {
         obstaculoIzquierda = true;
-      }     
-    }
-  }
-}
-
-void RevisaObstaculoPeriferiaMemoria() {
-  //Función que revisa los obstáculos detectados previamente y determina cuales están en la periferia actual
-  //Retorna una simplificación de si hay obstáculo adelante, a la derecha, a la izquierda o atrás
-
-  for (int i = 0; i <= ultimoObstaculo; i++) {  //Revisa todos los obstaculos que se han detectado y que siguen en memoria
-    //Busca si  la pose actual calza con la pose cuando se detectó el obstáculo. Uso un margen de tolerancia para la detección
-    if ( (abs(poseActual[0] - datosSensores[i][0]) < limiteObstaculos) &&
-         (abs(poseActual[1] - datosSensores[i][1]) < limiteObstaculos)){
-
-      if(datosSensores[i][3]!=0){ //Verifica si hay un obstaculo o si termino correctamente el avance
-        sinObstaculo= false;
-        
-        int anguloAbsoluto = datosSensores[i][5] + datosSensores[i][2]; //Cambiar angulo de obstaculo para ser respecto al origen de coordenadas
-        //Correción para tener valores entre -180 y 180
-        if(anguloAbsoluto > 180){anguloAbsoluto = anguloAbsoluto - 360;}
-        else if(anguloAbsoluto < -180){anguloAbsoluto = anguloAbsoluto + 360;}
-
-        int anguloReal = anguloAbsoluto - datosSensores[ultimoObstaculo][2]; //Cambiar angulo para ser respecto a la orientacion actual del robot
-        //Correción para tener valores entre -180 y 180
-        if(anguloReal > 180){anguloReal = anguloReal - 360;}
-        else if(anguloReal < -180){anguloReal = anguloReal + 360;}
-
-
-        //Evalua el ángulo del obstáculo y lo simplifica a si hay obstáculo adelante, a la derecha o a la izquierda
-        if (anguloReal >= -45 && anguloReal <= 45) {
-          obstaculoAdelante = true;
-          //Serial.println("Obstaculo adelante");
-        }
-        else if (anguloReal > 45 && anguloReal <= 135) {
-          obstaculoDerecha = true;
-          //Serial.println("Obstaculo derecha");
-        }
-        else if (anguloReal >= -135 && anguloReal < -45) {
-          obstaculoIzquierda = true;
-          //Serial.println("Obstaculo izquierda");
-        }
-        else if (anguloReal < -135 || anguloReal > 135) {
-          obstaculoAtras = true;
-          //Serial.println("Obstaculo atras");
-        }
-      }
-      else{
-        sinObstaculo= true;
       }     
     }
   }
@@ -1714,10 +1666,6 @@ float medirMagnet() {
   return angulo;
 }
 
-
-
-
-
 /**** RTC FUNCIONES****/
 
 inline bool RTCisSyncing() {
@@ -1906,196 +1854,6 @@ void medirMagnetCalibracion(short &x,short &y,short &z){
 void leeMPUCalibracion(float &gx,float &gy,float &gz,float &ax,float &ay,float &az){
   
   int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //datos crudos
-  
-void medirMagnetCalibracion(short &x,short &y,short &z){
-  segundoI2C.beginTransmission(0x68);   //empieza a comunicar con el mpu6050
-  segundoI2C.write(0x3B);   //envia byte 0x43 al sensor para indicar startregister
-  segundoI2C.endTransmission();   //termina comunicacion
-  segundoI2C.requestFrom(0x68,14); //pide 6 bytes al sensor, empezando del reg 43 (ahi estan los valores del giro)
-
-  ac_x = segundoI2C.read()<<8 | segundoI2C.read();
-  ac_y = segundoI2C.read()<<8 | segundoI2C.read();
-  ac_z = segundoI2C.read()<<8 | segundoI2C.read();
-
-  segundoI2C.beginTransmission(dirMag);
-  segundoI2C.write(0x00); //start with register 3.
-  segundoI2C.endTransmission();
-  tmp = segundoI2C.read()<<8 | segundoI2C.read();
-
-  //Read the data.. 2 bytes for each axis.. 6 total bytes
-  segundoI2C.requestFrom(dirMag, 6);
-  if (6 <= segundoI2C.available()) {
-    x = segundoI2C.read(); //LSB  x
-    x |= segundoI2C.read() << 8; //MSB  x
-    y = segundoI2C.read(); //LSB  y
-    y |= segundoI2C.read() << 8; //MSB y
-    z = segundoI2C.read(); //LSB z
-    z |= segundoI2C.read() << 8; //MSB z
-  }
-}
-
-  gx=float(gyro_x)-gx_off;
-  gy=float(gyro_y)-gy_off;
-  gz=float(gyro_z)-gz_off;
-
-  ax=float(ac_x)-acx_off;
-  ay=float(ac_y)-acy_off;
-  az=float(ac_z)+acz_off;
-}
-
-void maxMin(float arrayData[], float &maxV, float &minV){
-  for(int m=1; m<= puntosCalibracion; m++){
-    if(arrayData[m]> maxV){
-      maxV=arrayData[m];
-    }
-    if(arrayData[m]< minV){
-      minV=arrayData[m];
-    }
-  }
-}
-
-void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro de 360°, asegurarse que no tenga perturbaciones magneticas cerca en tiempo de calibración
-  Serial.println("Calibrando Magnetometro");
-  short x2,y2,z2;
-  float x1,y1,d;
-  float rawx[numSamples]; //Lista de datos crudos en x
-  float rawy[numSamples]; //Lista de datos crudos en y
-  
-  //Toma las muestras con la función Giro() sobre una circunferencia completa
-  while (!cal_mag){
-    medirMagnetCalibracion(x2,y2,z2);
-    if(Giro(360)==false){
-      if (puntosCalibracion==0){ //La variable i definirá la cantidad de datos que se tomen
-          rawx[puntosCalibracion]=float(x2);
-          rawy[puntosCalibracion]=float(y2);
-          puntosCalibracion++;
-        }
-        //Algoritmo que funciona durante la toma de datos para eliminar datos redundantes para no exceder la RAM del feather
-        else{
-          x1=rawx[puntosCalibracion-1];
-          y1=rawy[puntosCalibracion-1];
-          d=sqrt(pow(abs(x2-x1),2)+pow(abs(y2-y1),2)); //Distancia euclideana entre 2 pares de puntos
-          if (d>=1.0){
-            rawx[puntosCalibracion]=float(x2);
-            rawy[puntosCalibracion]=float(y2);
-            puntosCalibracion++;
-          }
-        }
-      }
-      //Etapa de filtrado, se utiliza el filtro de "Media movil"
-     else{
-       //Serial.println("Procesando datos...");
-       //Filtrado de datos
-       for (int s=0;s<=puntosCalibracion;s++){
-        float crudox=rawx[s];
-        float crudoy=rawy[s];
-        xft=crudox*alfa+(1-alfa)*xft;
-        yft=crudoy*alfa+(1-alfa)*yft;
-        if (s>=desfase){ //El desfase se implementa para eliminar datos iniciales basura
-          rawx[s-desfase]=xft;
-          rawy[s-desfase]=yft; 
-        }
-      }
-      //Calcula los maximos y mínimos
-      maxMin(rawx,maxX,minX);
-      maxMin(rawy,maxY,minY);
-
-      //Calcula los offset del elipsoide y los sustrae
-      xoff=(maxX+minX)/2;
-      yoff=(maxY+minY)/2;
-      for (int p=0;p<=puntosCalibracion;p++){
-          rawx[p]=rawx[p]-xoff;
-          rawy[p]=rawy[p]-yoff;
-      }
-      //Determina los segundos momentos de inercia
-      for (int h=0;h<=puntosCalibracion;h++){
-          sumXX=pow(rawx[h],2)+sumXX;
-          sumYY=pow(rawy[h],2)+sumYY;
-          sumXY=rawx[h]*rawy[h]+sumXY;
-      }
-      uXX=sumXX/puntosCalibracion;
-      uYY=sumYY/puntosCalibracion;
-      uXY=sumXY/puntosCalibracion;
-      //Calcula el angulo
-      angulo=0.5*atan2((2*uXY),(uXX-uYY));
-      //Escalado
-      if ((maxX-minX)>(maxY-minY)){
-        factorEsc=(maxX-minX)/(maxY-minY);
-      }
-      else{
-        factorEsc=-1*(maxY-minY)/(maxX-minX);
-      } 
-     //Guarda valores en la memoria EEPROM
-     guardarDatoFloat(xoff,0);
-     guardarDatoFloat(yoff,4);
-     guardarDatoFloat(angulo,8);
-     guardarDatoFloat(factorEsc,12); 
-     cal_mag=true;
-     //Serial.println("Magnetometro calibrado");
-    } 
-  }
-}
-
-void Calibracion_MPU(){  //Funcion que mide datos del MPU en posición horizontal y sin movimiento para calibracion y guarda la calibración en EEPROM
-  Serial.println("Calibrando MPU");
-  for(int j=0;j<=2;j++){
-    float gx_prom=0;
-    float gy_prom=0;
-    float gz_prom=0;
-    float acx_prom=0;
-    float acy_prom=0;
-    float acz_prom=0;
-    float gxx,gyy,gzz,axx,ayy,azz;
-    for (int i=0;i<=100;i++){
-      leeMPUCalibracion(gxx, gyy, gzz, axx, ayy, azz);
-      acx_prom=acx_prom+axx;
-      acy_prom=acy_prom+ayy;
-      acz_prom=acz_prom+azz;
-      gx_prom=gx_prom+gxx;
-      gy_prom=gy_prom+gyy;
-      gz_prom=gz_prom+gzz;
-    }
-  gx_off=gx_off+(gx_prom/100);
-  gy_off=gy_off+(gy_prom/100);
-  gz_off=gz_off+(gz_prom/100);
-  acx_off=acx_off+(acx_prom/100);
-  acy_off=acy_off+(acy_prom/100);
-  acz_off=acz_off+(16384-(acz_prom/100));
-  }
-  //Guarda los datos en la EEPROM
-  guardarDatoFloat(gx_off,16);
-  guardarDatoFloat(gy_off,20);
-  guardarDatoFloat(gz_off,24);
-  guardarDatoFloat(acx_off,28);
-  guardarDatoFloat(acy_off,32);
-  guardarDatoFloat(acz_off,36);
-  //Serial.println("MPU calibrada");
-  cal_mpu=true;
-}
-
-void calibrar(){
-  //Reducir velocidad del giro para darle tiempo al magnetómetro de obtener suficientes datos
-  limiteSuperiorCicloTrabajoGiro = limiteSuperiorCicloTrabajoGiroCalibracion;
-  limiteInferiorCicloTrabajoGiro = limiteInferiorCicloTrabajoGiroCalibracion;
-  if (!cal_mpu){
-    Calibracion_MPU();
-  }
-
-  if (!cal_mag){
-    Calibracion_Mag(); 
-  }
-  while(true){}//Detener ejecución para forzar reinicio despues de calibración
-}
-
-  ac_x = segundoI2C.read()<<8 | segundoI2C.read();
-  ac_y = segundoI2C.read()<<8 | segundoI2C.read();
-  ac_z = segundoI2C.read()<<8 | segundoI2C.read();
-
-  tmp = segundoI2C.read()<<8 | segundoI2C.read();
-
-  gyro_x = segundoI2C.read()<<8 | segundoI2C.read(); //combina los valores del registro 44 y 43, desplaza lo del 43 al principio
-  gyro_y = segundoI2C.read()<<8 | segundoI2C.read();
-  gyro_z = segundoI2C.read()<<8 | segundoI2C.read();
 
   gx=float(gyro_x)-gx_off;
   gy=float(gyro_y)-gy_off;
