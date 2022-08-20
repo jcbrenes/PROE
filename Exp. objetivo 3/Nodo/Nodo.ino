@@ -9,7 +9,7 @@
 #include <RHDatagram.h> // Biblioteca para la comunicación con direcciones
 
 /************ Serial Setup ***************/
-#define debug 1
+#define debug 0
 
 #if debug == 1
 #define serialPrint(x) Serial.print(x)
@@ -19,11 +19,12 @@
 #define serialPrintln(x)
 #endif
 
-int timeExperimentMinutes = 10; // Tiempo del experimento en minutos
-int timeExperiment = timeExperimentMinutes * 60000;
+//int timeExperimentMinutes = 1; // Tiempo del experimento en minutos
+// 1 minu = 60_000
+int timeExperiment = 18000; //timeExperimentMinutes * 6000;
 
 //Variables del enjambre para la comunicación a la base
-uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
 unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 //Variables para la comunicación por radio frecuencia
@@ -63,7 +64,7 @@ void setup() {
 
   //***Inicialización de puertos seriales***
   if (debug == 1){
-    Serial.begin(115200); //Puerto serie para comunicación con la PC
+    Serial.begin(19200); //Puerto serie para comunicación con la PC
     while (!Serial);
   }
   
@@ -86,8 +87,9 @@ void setup() {
     serialPrintln("setFrequency failed");
   }
 
-  rf69.setTxPower(20, true); // Configura la potencia
-  
+  rf69.setTxPower(13, true); // Configura la potencia puede ser de -2 a 20
+  // Se coloca en 13 para configurarlo como baja potencia
+
   rf69.setModeRx();
 
   /****Inicialización del RTC****/
@@ -111,9 +113,9 @@ void setup() {
   RTCenable();                          //Habilito de nuevo el RTC.
   RTCresetRemove();                     //Quito el reset del RTC.
 
-  //serialPrintln("¡RFM69 radio en funcionamiento!");
+  serialPrintln("¡RFM69 radio en funcionamiento!");
   delay(20);
-  //serialPrint("Robot: ");serialPrintln(idRobot);
+  serialPrint("Robot: ");serialPrintln(idRobot);
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
   sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
   serialPrintln("time;estado;ID;posX;posY;rot;tipSens;dis;angulo");

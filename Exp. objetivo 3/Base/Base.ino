@@ -64,7 +64,7 @@ char input;
 void setup()
 {
   if (debug == 1){
-    Serial.begin(115200);
+    Serial.begin(19200);
     while (!Serial); // wait until serial console is open, remove if not tethered to computer 
   }
 
@@ -90,7 +90,8 @@ void setup()
     serialPrintln("setFrequency failed");
   }
 
-  rf69.setTxPower(20, true); // Configura la potencia
+  rf69.setTxPower(13, true); // Configura la potencia puede ser de -2 a 20
+  // Se coloca en 13 para configurarlo como baja potencia
   
   rf69.setModeRx();
 
@@ -123,7 +124,7 @@ void setup()
   //sendCantidadRobots(&cantidadRobots); // Envía la cantidad de robots en el enjambre
 
   sincronizar(); // Envía el valor de clock a los robots del enjambre
-  serialPrintln("time;estado;ID;posX;posY;rot;tipSens;dis;angulo");
+  serialPrintln("posX;RSSI");
 }
 
 void loop() {
@@ -138,13 +139,7 @@ void loop() {
       dis = *(int16_t*)&buf[7];
       angulo = *(int16_t*)&buf[9];
     }
-    runningTime(RTC->MODE0.COUNT.reg);serialPrint("recibido;");
-    serialPrint(from);serialPrint(";");serialPrint(posX);serialPrint(";");serialPrint(posY);
-    serialPrint(";");serialPrint(rot);serialPrint(";");serialPrint(tipSens);
-    serialPrint(";");serialPrint(dis);serialPrint(";");serialPrintln(angulo);
-
-    //serialPrint("[RSSI ");serialPrint(rf69.lastRssi());serialPrintln("]");
-    
+    serialPrint(posX);serialPrint(";");serialPrintln(rf69.lastRssi());
   }
 }
 
