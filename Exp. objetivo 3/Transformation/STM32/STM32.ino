@@ -103,6 +103,8 @@ void setup() {
   //myServo.writeMicroseconds(1500);
   delay(1000); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
   revisarInterruptor();
+
+  crearMensaje(lecturaInicialSharp()); // Hace la lectura para la transformación de coordenadas
 }
  
 void loop() {
@@ -115,6 +117,21 @@ void loop() {
   encenderLED(); //Serial1.println("LED"); //enciende un led si alguna función lo activó 
   actividad(); //Serial1.println("Actividad");//Parpadea led amarillo para confirmar actividad del stm
   
+}
+
+/// \brief Realiza la lectura inicial de la distancia que está el robot.
+/// \return La distancia filtrada después de 100 mediciones
+int lecturaInicialSharp(){
+    int contador = 0;
+    while (contador < 100){
+        lectura=analogRead(sharp);
+        filtrado=filtrado-(beta*(filtrado-lectura)); //Filtro de media movil
+        distancia=1274160*pow(filtrado,-1.174); //Regresión lineal de datos experimentales para obtener distancia en milimetros
+        delay(50);
+        contador += 1;
+    }
+
+    return int(distancia);
 }
 
 void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
