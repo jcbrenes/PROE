@@ -175,7 +175,7 @@ int anguloGiro = 0;
 
 //Variables para el magnetómetro y su calibración
 const float declinacionMag = 0.0; //correccion del campo magnetico respecto al norte geográfico en Costa Rica
-const float alfa = 0.2; //constante para filtro de datos
+const float alfa = 0.8; //constante para filtro de datos
 float xft=0; //Valores filtrados
 float yft=0;
 float xoff = 0; //offset de calibración en x
@@ -194,11 +194,10 @@ float ayft, gzft;
 //Variables de calibración para magnetometro 
 const int numSamples=2000;
 const int desfase=(1-alfa)*20;
-int puntosCalibracion=0; //Contadores para calibración
-float maxX,minX,maxY,minY; // Maximos y minimos de los datos
-float sumXX,sumYY,sumXY; //Sumas para los momentos de inercia
-float uXX,uYY,uXY; //Momentos de inercia
-float angulo; //Angulo de rotación de los datos
+short puntosCalibracion=0; //Contadores para calibración
+short maxX=0,minX=0,maxY=0,minY=0; // Maximos y minimos de los datos
+float uXX=0,uYY=0,uXY=0; //Momentos de inercia
+float angulo=0; //Angulo de rotación de los datos
 
 bool cal_mag=0;
 bool cal_mpu=0;
@@ -344,7 +343,7 @@ void setup() {
 
   Serial.println("¡RFM69 radio en funcionamiento!");
   delay(1000);
-  
+
   //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
   //sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
 
@@ -713,7 +712,7 @@ void RevisaObstaculoPeriferiaMemoria() {
         if(anguloAbsoluto > 180){anguloAbsoluto = anguloAbsoluto - 360;}
         else if(anguloAbsoluto < -180){anguloAbsoluto = anguloAbsoluto + 360;}
 
-        int anguloReal = poseActual[2] - anguloAbsoluto; //Cambiar angulo para ser respecto a la orientacion actual del robot
+        int anguloReal = anguloAbsoluto - poseActual[2]; //Cambiar angulo para ser respecto a la orientacion actual del robot
         //Correción para tener valores entre -180 y 180
         if(anguloReal > 180){anguloReal = anguloReal - 360;}
         else if(anguloReal < -180){anguloReal = anguloReal + 360;}
@@ -1550,6 +1549,7 @@ void inicializaMagnet() {
   //segundoI2C.write(0x05); // Modo: Continuously Measure, 50Hz, 2 Gauss, OSR 512
   //segundoI2C.write(0x15); // Modo: Continuously Measure, 50Hz, 8 Gauss, OSR 512
   //segundoI2C.write(0x19); // Modo: Continuously Measure, 100Hz, 8 Gauss, OSR 512
+  //segundoI2C.write(0x30); // Modo: Continuously Measure, 200Hz, 2 Gauss, OSR 512
   segundoI2C.endTransmission();
 
   //Carga los valores de calibración del magnetometro
@@ -1830,30 +1830,31 @@ void leeMPUCalibracion(float &gx,float &gy,float &gz,float &ax,float &ay,float &
   az=float(ac_z)+acz_off;
 }
 
-void maxMin(float arrayData[], float &maxV, float &minV){
-  for(int m=1; m<= puntosCalibracion; m++){
+void maxMinShort(short arrayData[], short &maxV, short &minV){
+  for(int m=1; m< puntosCalibracion; m++){
     if(arrayData[m]> maxV){
       maxV=arrayData[m];
     }
-    if(arrayData[m]< minV){
+    else if(arrayData[m]< minV){
       minV=arrayData[m];
     }
   }
 }
 
 void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro de 360°, asegurarse que no tenga perturbaciones magneticas cerca en tiempo de calibración
+  //Evita usar una lista de flotantes para los valores medidos, en su lugar calcula los valores necesarios con cada medición y los almacena
   Serial.println("Calibrando Magnetometro");
-  short x2,y2,z2;
-  float x1,y1,d;
-  float rawx[numSamples]; //Lista de datos crudos en x
-  float rawy[numSamples]; //Lista de datos crudos en y
+  short x2=0,y2=0,z2=0;
+  float x1=0,y1=0,d=0;
+  short rawx[numSamples]={0}; //Lista de datos crudos en x
+  short rawy[numSamples]={0}; //Lista de datos crudos en y
   //Toma las muestras con la función Giro() sobre una circunferencia completa
   while (!cal_mag){
     medirMagnetCalibracion(x2,y2,z2);
     if(Giro(360)==false){
       if (puntosCalibracion==0){ //La variable i definirá la cantidad de datos que se tomen
-          rawx[puntosCalibracion]=float(x2);
-          rawy[puntosCalibracion]=float(y2);
+          rawx[puntosCalibracion]=x2;
+          rawy[puntosCalibracion]=y2;
           puntosCalibracion++;
         }
         //Algoritmo que funciona durante la toma de datos para eliminar datos redundantes para no exceder la RAM del feather
@@ -1862,29 +1863,27 @@ void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro
           y1=rawy[puntosCalibracion-1];
           d=sqrt(pow(abs(x2-x1),2)+pow(abs(y2-y1),2)); //Distancia euclideana entre 2 pares de puntos
           if (d>=1.0){
-            rawx[puntosCalibracion]=float(x2);
-            rawy[puntosCalibracion]=float(y2);
+            rawx[puntosCalibracion]=x2;
+            rawy[puntosCalibracion]=y2;
             puntosCalibracion++;
           }
         }
       }
       //Etapa de filtrado, se utiliza el filtro de "Media movil"
      else{
-       //Serial.println("Procesando datos...");
+       Serial.println("Procesando datos...");
        //Filtrado de datos
        for (int s=0;s<=puntosCalibracion;s++){
-        float crudox=rawx[s];
-        float crudoy=rawy[s];
-        xft=crudox*alfa+(1-alfa)*xft;
-        yft=crudoy*alfa+(1-alfa)*yft;
+        xft=rawx[s]*alfa+(1-alfa)*xft;
+        yft=rawy[s]*alfa+(1-alfa)*yft;
         if (s>=desfase){ //El desfase se implementa para eliminar datos iniciales basura
           rawx[s-desfase]=xft;
           rawy[s-desfase]=yft; 
         }
       }
       //Calcula los maximos y mínimos
-      maxMin(rawx,maxX,minX);
-      maxMin(rawy,maxY,minY);
+      maxMinShort(rawx,maxX,minX);
+      maxMinShort(rawy,maxY,minY);
 
       //Calcula los offset del elipsoide y los sustrae
       xoff=(maxX+minX)/2;
@@ -1893,31 +1892,62 @@ void Calibracion_Mag(){  //Función que calibra el magnetometro, realiza un giro
           rawx[p]=rawx[p]-xoff;
           rawy[p]=rawy[p]-yoff;
       }
+
       //Determina los segundos momentos de inercia
       for (int h=0;h<=puntosCalibracion;h++){
-          sumXX=(rawx[h]*rawx[h])+sumXX;
-          sumYY=(rawy[h]*rawy[h])+sumYY;
-          sumXY=rawx[h]*rawy[h]+sumXY;
+        uXX=((rawx[h]*rawx[h])/puntosCalibracion)+uXX;
+        uYY=((rawy[h]*rawy[h])/puntosCalibracion)+uYY;
+        uXY=((rawx[h]*rawy[h])/puntosCalibracion)+uXY;
       }
-      uXX=sumXX/puntosCalibracion;
-      uYY=sumYY/puntosCalibracion;
-      uXY=sumXY/puntosCalibracion;
+      
       //Calcula el angulo
       angulo=0.5*atan2((2*uXY),(uXX-uYY));
       //Escalado
       if ((maxX-minX)>(maxY-minY)){
-        factorEsc=(maxX-minX)/(maxY-minY);
+        factorEsc=(float(maxX-minX)/float(maxY-minY));
       }
       else{
-        factorEsc=-1*(maxY-minY)/(maxX-minX);
+        factorEsc=-1*(float(maxY-minY)/float(maxX-minX));
       } 
      //Guarda valores en la memoria EEPROM
      guardarDatoFloat(xoff,0);
      guardarDatoFloat(yoff,4);
      guardarDatoFloat(angulo,8);
      guardarDatoFloat(factorEsc,12); 
+     delay(500);
+
+    Serial.print("xoff: ");Serial.println(xoff);
+    Serial.print("yoff: ");Serial.println(yoff);
+    Serial.print("angElips: ");Serial.println(angulo);
+    Serial.print("factorEsc: ");Serial.println(factorEsc);
+
+
      cal_mag=true;
      //Serial.println("Magnetometro calibrado");
+
+
+
+              /*Serial.println("*********************Lista corregida****************");
+              float xrot, yrot, xf, yf;
+              short xin, yin;
+              for(int i=0; i<puntosCalibracion; i++){
+                xin=rawx[i];
+                yin=rawy[i];
+                //Rotación y escalamiento de los datos
+                xrot = xin * cos(-angulo) - yin * sin(-angulo);
+                yrot = xin * sin(-angulo) + yin * cos(-angulo);
+                if (factorEsc > 0) {
+                  xf = cos(angulo) * xrot * factorEsc - yrot * sin(angulo);
+                  yf = sin(angulo) * xrot + cos(angulo) * yrot * factorEsc;
+                }
+                else {
+                  xf = -1 * cos(angulo) * xrot * factorEsc - yrot * sin(angulo);
+                  yf = -1 * sin(angulo) * xrot + cos(angulo) * yrot * factorEsc;
+                }
+                Serial.print(xf);
+                Serial.print(",");
+                Serial.println(yf);
+              }*/
     } 
   }
 }
