@@ -20,6 +20,17 @@
 #include <Wire_slave.h>   //para usar el STM32 como secundario en el puerto I2C                   
 //https://github.com/rogerclarkmelbourne/Arduino_STM32/tree/master/STM32F1/libraries/WireSlave 
 
+/************ Serial Setup ***************/
+#define debug 1
+
+#if debug == 1
+#define serialPrint(x) Serial1.print(x)
+#define serialPrintln(x) Serial1.println(x)
+#else
+#define serialPrint(x)
+#define serialPrintln(x)
+#endif
+
 Servo myServo;
 
 //Declaración de pines//
@@ -36,6 +47,10 @@ Servo myServo;
 #define int1 PA4 //Pin de interrupción para el feather
 #define sharp PA0 //Sharp (ir de distancia)
 
+// Configuración inicial
+bool distInicialListo = false;
+int inicioFeatherListo = 0;
+int offsetDistanciaInicial = 160; // Se agrega un offset de 16cm para la medición del sharp
 
 //Constantes de configuración//
 const float beta=0.1;  //Constante para el filtro, ajustar para cambiar el comportamiento
@@ -49,7 +64,7 @@ const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el ser
 int angulo=0;
 int anguloAnterior=0;
 int lectura=0;
-float distancia=0;
+float distancia=0; // Distancia medida por el sharp
 float filtrado=0;
 int cuentaBateria=0;
 int sensorIRdetectado=0;
@@ -103,18 +118,47 @@ void setup() {
   //myServo.writeMicroseconds(1500);
   revisarInterruptor();
   delay(100); //Algunos sensores capturan ruido al inicio, los delays es para evitar eso
+
+  avizarDistancia(lecturaInicialSharp()); // Hace la lectura para la transformación de coordenadas
+  serialPrintln("Lectura de distancia lista");
 }
  
 void loop() {
-  moverServo(); //Serial1.println("Servo");
-  revisarSharp(); Serial1.println("Sharp");
-  pollingSensoresIR(); //Serial1.println("Poll");  //Leer sensores IR por polling
-  revisarSensoresIR(); //Serial1.println("IR");
-  revisarTemperatura(); //desactivado mientras no está soldado el sensor al PCB
-  revisarBateria(); //Serial1.println("Bat");
-  encenderLED(); //Serial1.println("LED"); //enciende un led si alguna función lo activó 
-  actividad(); //Serial1.println("Actividad");//Parpadea led amarillo para confirmar actividad del stm
-  
+  if (distInicialListo){
+    moverServo(); //Serial1.println("Servo");
+    revisarSharp(); Serial1.println("Sharp");
+    pollingSensoresIR(); //Serial1.println("Poll");  //Leer sensores IR por polling
+    revisarSensoresIR(); //Serial1.println("IR");
+    revisarTemperatura(); //desactivado mientras no está soldado el sensor al PCB
+    revisarBateria(); //Serial1.println("Bat");
+    encenderLED(); //Serial1.println("LED"); //enciende un led si alguna función lo activó 
+    actividad(); //Serial1.println("Actividad");//Parpadea led amarillo para confirmar actividad del stm
+  }
+}
+
+/// \brief Realiza la lectura inicial de la distancia que está el robot.
+/// \return La distancia filtrada después de 100 mediciones
+int lecturaInicialSharp(){
+    int contador = 0;
+    while (contador < 100){
+        lectura=analogRead(sharp);
+        filtrado=filtrado-(beta*(filtrado-lectura)); //Filtro de media movil
+        distancia=1274160*pow(filtrado,-1.174); //Regresión lineal de datos experimentales para obtener distancia en milimetros
+        delay(50);
+        contador += 1;
+    }
+    Serial1.println(distancia);
+    return int(distancia + offsetDistanciaInicial);
+}
+
+/// \brief Crea el mensaje a ser enviado para la transformación de coordenadas e indica que está listo para transmitir
+void avizarDistancia(int information){ //Prepara el paquete de datos con la información de obstaculo detectado    
+  sprintf(dato, "%d.", information); //Genera un string para la transmisión
+  nuevoObstaculo = true;
+  digitalWrite(int1,HIGH); //Pulsar salida int1 para indicarle al feather que se detectó un obstaculo 
+  delay(50);
+  digitalWrite(int1,LOW);  
+  delay(1000); //delay para que el STM no sature al feather con la misma interrupción
 }
 
 void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
@@ -260,6 +304,13 @@ void responderFeather(){
   if (nuevoObstaculo){ //Evita enviar el mismo obstaculo dos veces
     Wire.write(dato);  //Envia el valor al master
     nuevoObstaculo = false;
+    // El feather debe avisar que terminó el proceso de arranque, luego la operación es normal
+    if (inicioFeatherListo == 2 && distInicialListo == false){
+      distInicialListo = true;
+    }else{
+      inicioFeatherListo += 1;
+      nuevoObstaculo = true;
+    }
   }else{
     Wire.write(""); 
   }

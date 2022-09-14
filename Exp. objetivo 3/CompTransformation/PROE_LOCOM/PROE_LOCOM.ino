@@ -19,9 +19,17 @@
 #define serialPrintln(x)
 #endif
 
+
 //Variables del enjambre para la comunicación a la base
-uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+int cantPaquetesDistanciaEnviados = 0; //Variable para contar la cantidad de paquetes que envia con la medición inicial
+int cantPaquetesDistanciaPorEnviar = 5; // Cantidad de paquetes a enviar para la medición inicial.
+
+// Variables para el proceso de arranque y transformación de coordenadas
+int distCoordenadas; //Distancia inicial de los robot 
+bool datoCoordenadas = false; // Primer dato STM32 es la distancia entre robots
+bool envieCoordenadas = false; // Indica si las coordenadas entre robots se envió y terminar las configuraciones iniciales.
 
 //constantes del robot empleado
 const int tiempoMuestreo=100000; //unidades: micro segundos
@@ -216,7 +224,6 @@ bool cal_mpu=0;
 
 //Variables para la comunicación por radio frecuencia
 #define RF69_FREQ      915.0   //La frecuencia debe ser la misma que la de los demas nodos.
-#define DEST_ADDRESS   10      //No sé si esto es totalmente necesario, creo que no porque nunca usé direcciones.
 #define MY_ADDRESS     idRobot //Dirección de este nodo. La base la usa para enviar el reloj al inicio
 
 //Definición de pines. Creo que no todos se están usando, me parece que el LED no.
@@ -231,7 +238,7 @@ RHDatagram rf69_manager(rf69, MY_ADDRESS);
 
 //Variables para el mensaje que se va a transmitir a la base
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
-unsigned long tiempoRobotTDMA = 20; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
+unsigned long tiempoRobotTDMA = 30; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
 unsigned long tiempoCicloTDMA = cantidadRobots * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
 unsigned long timeStamp1; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene apenas se recibe el reloj.
 unsigned long timeStamp2; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene al guardar en memoria el reloj.
@@ -361,8 +368,9 @@ void setup() {
   Serial.println("¡RFM69 radio en funcionamiento!");
   delay(1000);
 
-  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
+  //******En caso de usar el robot solo (no como enjambre), comentar las dos siguiente lineas
   sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  transformation(); // Proceso de transformación de coordenadas
 
   //descomentar la siguiente linea si se quiere llevar el robot a cierta coordenada
   //estado = CONTROL_POSE;
@@ -683,18 +691,25 @@ void ActualizarUbicacionReal() {
 
 }
 
+/// @brief Interrupción que realiza el STM32
 void DeteccionObstaculo(){
-//Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
-//Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
+  //Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
 
-  if(estado!=RETROCEDA && giroTerminado==1 && tiempoActual>2000){
-    //Solo si el estado ya no es retroceder.  También que no está haciendo un giro 
-    //y para que ignore las interrupciones los primeros segundos al encenderlo
-    estado=RETROCEDA;
-    ActualizarUbicacionReal(); //Como se interrumpió un movimiento, actualiza la ubicación actual
-    ConfiguracionParar(); //Se detiene un momento y reset de encoders 
-    tiempoRetroceso= tiempoActual; //Almacena el ultimo tiempo para usarlo en el temporizador
-  }   
+  // Primero verifica que no esté en el proceso de arranque
+  if (!datoCoordenadas){
+    distCoordenadas = leerDistanciaSTM();
+    datoCoordenadas = true;
+  }else{// Modo normal de operación
+    //Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
+    if(estado!=RETROCEDA && giroTerminado==1 && tiempoActual>2000){
+      //Solo si el estado ya no es retroceder.  También que no está haciendo un giro 
+      //y para que ignore las interrupciones los primeros segundos al encenderlo
+      estado=RETROCEDA;
+      ActualizarUbicacionReal(); //Como se interrumpió un movimiento, actualiza la ubicación actual
+      ConfiguracionParar(); //Se detiene un momento y reset de encoders 
+      tiempoRetroceso= tiempoActual; //Almacena el ultimo tiempo para usarlo en el temporizador
+    }
+  }
 }
 
 
@@ -981,10 +996,13 @@ int ControlPosGiroRueda( float posRef, float posActual, float& sumErrorGiro, flo
   return  pidTermGiro;
 }
 
+
+/// @brief Función que revisa el estado de la acción de control y si se mantiene varios ciclos en cero, asume que ya está en el estado estacionario
+/// @param pwmRuedaDer Ciclo de trabajo de la rueda derecha
+/// @param pwmRuedaIzq Ciclo de trabajo de la rueda izquierda 
+/// @param contCiclosEstacionario Variable referencia donde se almacena la cantidad de ciclo seguidos que llevan
+/// @return true si se llegó al estadio estacionario y false si aún no está en el estado estacionario
 bool EstadoEstacionario (int pwmRuedaDer, int pwmRuedaIzq, int& contCiclosEstacionario) {
-  //Función que revisa el estado de la acción de control y si se mantiene varios ciclos en cero, asume que ya está en el estado estacionario
-  //Recibe los ciclos de trabajo en cada rueda y una variable por referencia donde se almacenan cuantos ciclos seguidos se llevan
-  //Devuelve una variable que es TRUE si ya se alcanzó el estado estacionario
 
   bool estadoEstacionarioAlcanzado = false;
 
@@ -1644,6 +1662,121 @@ float medirMagnet() {
   return angulo;
 }
 
+/**** TRANSFORMACIÓN DE COORDENADAS ****/
+
+/// \brief Crea las matrices de transformación a ser utilizadas
+void transformation(){
+    serialPrintln(distCoordenadas);
+    crearMensajeCoordenadas(distCoordenadas);
+
+    int distanciasRecibidas[cantidadRobots]; // Arreglo para almacenar las distancias entre robots
+    bool distanciaRobotRecibida[cantidadRobots]; // Arreglo para saber que distancia se ha recibido
+    bool todasDistanciasRecibidas = false;
+
+    for (int i = 0; i < cantidadRobots; i++)
+    {
+      if (i == (int)idRobot){
+        distanciaRobotRecibida[i] = true;
+      }else{
+        distanciaRobotRecibida[i] = false;
+      }
+    }
+    
+    while (!todasDistanciasRecibidas && cantPaquetesDistanciaEnviados == cantPaquetesDistanciaPorEnviar)
+    {
+      if (rf69_manager.available()){
+        if (rf69_manager.recvfrom(buf, &len, &from)){
+          buf[len] = 0;
+          distCoordenadas = *(int16_t*)&buf[0];
+
+          distanciasRecibidas[from - 1] = distCoordenadas;
+          distanciaRobotRecibida[from - 1] = true;
+        }
+        serialPrint(from);serialPrint(' ');serialPrintln(distCoordenadas);
+      }
+
+      for (int i = 0; i < cantidadRobots - 1; i++)
+      {
+        if (distanciaRobotRecibida[i] == true && distanciaRobotRecibida[i+1] == true){
+          todasDistanciasRecibidas = true;
+        }
+        else{
+          todasDistanciasRecibidas = false;
+        }
+      }
+    }
+
+    // El filtro se debe estabilizar
+    for (int i = 0; i < 200; i++)
+    {
+      ultimoAngMagnet= medirMagnet(); //medición de la orientación con el magnetómetro
+      detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
+      leeMPU(anguloMPU,velMPU); //medición del MPU
+    }
+    
+
+    giroTerminado = false;
+    // Se toma el inicio en que se realiza el giro    
+    tiempoGiro=millis();
+
+    while (!giroTerminado){
+
+      ultimoAngMagnet= medirMagnet(); //medición de la orientación con el magnetómetro
+      detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
+      leeMPU(anguloMPU,velMPU); //medición del MPU
+
+      // Se especifica que debe girar -90 grados
+      giroTerminado=Giro(-90);
+
+      // Se espera un tiempo que realice el giro
+      if ((millis() - tiempoGiro) > limiteGiro){ //Si pasa mas del limite de tiempo tratando de girar se detiene y lo trata como si hubiera completado el giro, evita que se quede intentando girar si está bloqueado
+        giroTerminado = true;
+      }
+      
+      if(giroTerminado){
+        ConfiguracionParar();
+      }
+      delay(int(tiempoMuestreo/1000));
+    }
+    
+    leerDistanciaSTM();
+
+}
+
+/// \brief Pide el valor de distancia al STM32
+/// \return La distancia inicial entre los robots 
+int leerDistanciaSTM(){
+    String acumulado = "";
+    Wire.requestFrom(dirSTM, cantBytesMsg);    // Pide cierta cantidad de datos al esclavo
+    int infDistanciaSTM;
+    while (0 < Wire.available()) { // ciclo mientras se reciben todos los datos
+        char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
+        if (c == '.'){
+            infDistanciaSTM =  acumulado.toInt();
+        }else{
+            acumulado += c;
+        }
+    }
+    return infDistanciaSTM;
+}
+
+/// @brief  \brief Crea el mensaje a enviar para la transformación de coordenadas
+/// @param distancia Distancia entre el centro de los robots
+void crearMensajeCoordenadas(int distancia){
+  if(timeReceived && !mensajeCreado){    
+    uint16_t dist = (uint16_t)distancia;
+
+    ptrMensaje = (uint16_t*)&dist;
+    for (uint8_t i = 0; i < 2; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << i * 8)) >> i * 8; //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
+    }
+
+    //Una vez creado el mensaje, no vuelvo a crear otro hasta que la interrupción baje la bandera.
+    mensajeCreado = true;
+  }
+}
+
+
 /**** RTC FUNCIONES****/
 
 inline bool RTCisSyncing() {
@@ -1734,6 +1867,14 @@ void RTC_Handler(void) {
 
     rf69_manager.sendto(mensaje, sizeof(mensaje), RH_BROADCAST_ADDRESS);        //Llamo a la función de enviar de la biblioteca Radio Head para enviar el mensaje del nodo.
     mensajeCreado = false;                      //Bajo la bandera para indicar que ya se envió el mensaje y se puede crear uno nuevo.
+
+    // Envia el paquete de distancia entre robots 5 veces
+    if (cantPaquetesDistanciaEnviados < cantPaquetesDistanciaPorEnviar)
+    {
+      mensajeCreado = true;
+      cantPaquetesDistanciaEnviados += 1;
+    }
+    
 
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }

@@ -16,6 +16,14 @@
 #define serialPrintln(x)
 #endif
 
+// Variables para la transformación de coordenadas
+int cantidadRobots = 3;
+int distCoordenadas;
+int cantPaquetesDistanciaPorEnviar = 5; // Cantidad de paquetes a enviar para la medición inicial.
+int tiempoRobotTDMA = 30;
+int tiempoEsperaMinimo = cantidadRobots*cantPaquetesDistanciaPorEnviar*tiempoRobotTDMA; // Tiempo que debe esperar el robot
+
+
 /************ Radio Setup ***************/
 #define RF69_FREQ 915.0   // Frecuencias deben ser iguales con respecto a los demás nodos
 #define MY_ADDRESS     0  // Dirección del receptor (base). No sé si es necesaria.
@@ -82,6 +90,8 @@ void setup()
   Serial.print("RFM69 radio @");  Serial.print((int)RF69_FREQ);  Serial.println(" MHz");
 
   sincronizar(); // Envía el valor de clock a los robots del enjambre
+
+  transformation(); // Recibe la información de la transoformación de coordenadas
 }
 
 void loop() {
@@ -96,11 +106,13 @@ void loop() {
       dis = *(int16_t*)&buf[7];
       angulo = *(int16_t*)&buf[9];
     }
-    serialPrint(from);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
-    serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
-    serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrint(angulo);
+    if (tipSens != 0){
+      serialPrint(from);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
+      serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
+      serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrint(angulo);
 
-    serialPrint("[RSSI ");serialPrint(rf69.lastRssi());serialPrintln("]");
+      serialPrint("[RSSI ");serialPrint(rf69.lastRssi());serialPrintln("]");
+    }
   }
   
   actividad();
@@ -117,6 +129,48 @@ bool sincronizar(){
   }
 
   return rf69_manager.sendto(reloj, sizeof(reloj), RH_BROADCAST_ADDRESS);     //Enviar valor del RTC al esclavo
+}
+
+void transformation(){
+  int distanciasRecibidas[cantidadRobots]; // Arreglo para almacenar las distancias entre robots
+    bool distanciaRobotRecibida[cantidadRobots]; // Arreglo para saber que distancia se ha recibido
+    bool todasDistanciasRecibidas = false;
+
+    for (int i = 0; i < cantidadRobots; i++)
+    {
+      distanciaRobotRecibida[i] = false;
+    }
+    
+    while (!todasDistanciasRecibidas)
+    {
+      if (rf69_manager.available()){
+        if (rf69_manager.recvfrom(buf, &len, &from)){
+          buf[len] = 0;
+          distCoordenadas = *(int16_t*)&buf[0];
+
+          distanciasRecibidas[from - 1] = distCoordenadas;
+          distanciaRobotRecibida[from - 1] = true;
+        }
+        serialPrint(from);serialPrint(' ');serialPrintln(distCoordenadas);
+      }
+
+      for (int i = 0; i < cantidadRobots - 1; i++)
+      {
+        if (distanciaRobotRecibida[i] == true && distanciaRobotRecibida[i+1] == true){
+          todasDistanciasRecibidas = true;
+        }
+        else{
+          todasDistanciasRecibidas = false;
+        }
+      }
+    }
+
+    for (int i = 0; i < cantidadRobots; i++)
+    {
+      serialPrint(i+1);serialPrint(' ');serialPrintln(distanciasRecibidas[i]);
+    }
+    
+
 }
 
 void actividad(){  //Pulsar led 13 para mostrar actividad del feather
