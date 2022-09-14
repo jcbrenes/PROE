@@ -9,7 +9,7 @@
 #include <RHDatagram.h> // Biblioteca para la comunicación con direcciones
 
 /************ Serial Setup ***************/
-#define debug 1
+#define debug 0
 
 #if debug == 1
 #define serialPrint(x) Serial.print(x)
@@ -19,12 +19,28 @@
 #define serialPrintln(x)
 #endif
 
-int timeExperimentMinutes = 10; // Tiempo del experimento en minutos
-int timeExperiment = timeExperimentMinutes * 60000;
+// Nuevas variables
+int distCoordenadas; //Distancia inicial de los robot 
+bool datoCoordenadas = false; // Primer dato STM32 es la distancia entre robots
+bool envieCoordenadas = false; // Indica si las coordenadas entre robots se envió y terminar las configuraciones iniciales.
 
 //Variables del enjambre para la comunicación a la base
 uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
 unsigned long idRobot = 1; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+
+//Configuracion de los pines de interrupcion de Obstáculos
+const int INT_OBSTACULO = A4;
+
+//Almacenamiento de datos de obstáculos
+const int longitudArregloObstaculos = 100;
+
+//Constantes algoritmo exploración
+const int unidadAvance= 1000; //medida en mm que avanza cada robot por movimiento
+const int unidadRetroceso= -50; //medida en mm que retrocede el robot al encontrar un obstáculo
+const unsigned long limiteRetroceso= 5000; //Máximo tiempo (ms) permitido para completar el retroceso, si no termina en ese tiempo asume que tiene un obstaculo atras
+unsigned long tiempoRetroceso=0; //Almacena el momento en que se cambia a estado de retroceso para usar el limite de tiempo
+const int limiteGiro= 5000; //Máximo tiempo permitido para completar el giro, permite que siga el movimiento si no se puede completar el giro por obstaculo o no se logra estado estacionario
+unsigned long tiempoGiro=0; //Almacena el momento en que se cambia al estado de giro
 
 
 //Constantes comunicación I2C con STM
@@ -40,9 +56,17 @@ TwoWire segundoI2C(&sercom1, 11, 13);
 #define A_R 16384.0
 #define G_R 131.0
 
+//Variables para el almacenar datos de obstáculos
+int datosSensores[longitudArregloObstaculos][6]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
+int ultimoObstaculo = -1; //Apuntador al último obstáculo en el arreglo. Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
+int minEnviado = 0; //Almacena el recorrido de la lista de obstaculos
+bool nuevoObstaculo = false; //Bandera verdadera cuando se detecta un nuevo obstaculo
+unsigned long tiempoSTM = 0; //Almacena el tiempo de muestreo del STM
+int limiteObstaculos=unidadAvance/10; //Distancia minima que el robot debe moverse para olvidar los obstaculos detectados hasta ese momento, para random walk con memoria
+bool resetObstaculos=false; //Bandera que permite reiniciar los obstaculos detectados en loop principal para no afectar tiempos de movimiento
+
 //Variables para la comunicación por radio frecuencia
 #define RF69_FREQ      915.0   //La frecuencia debe ser la misma que la de los demas nodos.
-#define DEST_ADDRESS   10      //No sé si esto es totalmente necesario, creo que no porque nunca usé direcciones.
 #define MY_ADDRESS     idRobot //Dirección de este nodo. La base la usa para enviar el reloj al inicio
 
 //Definición de pines. Creo que no todos se están usando, me parece que el LED no.
@@ -156,60 +180,58 @@ int dis;
 int angulo;
 
 void loop(){
-    if (rf69_manager.available()){
-      if (rf69_manager.recvfrom(buf, &len, &from)){
-        buf[len] = 0;
-      }
+  if (rf69_manager.available()){
+    if (rf69_manager.recvfrom(buf, &len, &from)){
+      buf[len] = 0;
     }
+  }
 }
 
 /// \brief Crea las matrices de transformación a ser utilizadas
 void transformation(){
-    
+    serialPrintln(distCoordenadas);
+    crearMensajeCoordenadas(distCoordenadas);
 }
 
-/// \brief Pide al STM32 que le envíe información
-void leerMsgSTM ()  {
-  //Función llamada cuando se recibe algo en el puerto I2C conectado al STM32
-  //Almacena en una matriz las variables de tipo de sensor, distancia y ángulo
-  int cont = 1;
-  int tipoSensor = 0;
-  int distancia = 0;
-  int angulo = 0;
-  String acumulado = "";
+/// \brief Interrupción que realiza el STM32
+void DeteccionObstaculo(){
+  if (!datoCoordenadas){
+    distCoordenadas = leerDistanciaSTM();
+    datoCoordenadas = true;
+  }
+}
 
-  Wire.requestFrom(dirSTM, cantBytesMsg);    // Pide cierta cantidad de datos al esclavo
-  
-  while (0 < Wire.available()) { // ciclo mientras se reciben todos los datos
-    char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
-    if (c == ',') { //los datos vienen separados por coma
-      if (cont == 1) {
-        tipoSensor = acumulado.toInt();
-        acumulado = "";
-      }
-      if (cont == 2) {
-        distancia = acumulado.toInt();
-        acumulado = "";
-      }
-      cont++;
-    } else if (c == '.') { //el ultimo dato viene con punto al final
-      angulo = acumulado.toInt();
-      acumulado = "";
-      cont = 1;
-    } else {
-      acumulado += c;  //añade el caracter a la cadena anterior
+/// \brief Pide el valor de distancia al STM32
+/// \return La distancia inicial entre los robots 
+int leerDistanciaSTM(){
+    String acumulado = "";
+    Wire.requestFrom(dirSTM, cantBytesMsg);    // Pide cierta cantidad de datos al esclavo
+    int infDistanciaSTM;
+    while (0 < Wire.available()) { // ciclo mientras se reciben todos los datos
+        char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
+        if (c == '.'){
+            infDistanciaSTM =  acumulado.toInt();
+        }else{
+            acumulado += c;
+        }
     }
-  }
-  
-  if (tipoSensor>0){ //Si el sensor sigue en 0 significa que el STM no envió nada
-    CrearObstaculo(tipoSensor, distancia, angulo);
-    resetObstaculos=false;
-  }
+    return infDistanciaSTM;
+}
 
-  else if(tipoSensor==-1){ //Si llega tipoSensor==-1 significa que el interruptor está encendido, se va a usar para pedir calibración
-    calibrar();
-  }
+/// @brief  \brief Crea el mensaje a enviar para la transformación de coordenadas
+/// @param distancia Distancia entre el centro de los robots
+void crearMensajeCoordenadas(int distancia){
+  if(timeReceived && !mensajeCreado){    
+    uint16_t dist = (uint16_t)distancia;
 
+    ptrMensaje = (uint16_t*)&dist;
+    for (uint8_t i = 0; i < 2; i++) {
+      mensaje[i] = (*ptrMensaje & (255UL << i * 8)) >> i * 8; //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
+    }
+
+    //Una vez creado el mensaje, no vuelvo a crear otro hasta que la interrupción baje la bandera.
+    mensajeCreado = true;
+  }
 }
 
 /// \brief Crea el mensaje a ser enviado 
@@ -231,10 +253,6 @@ void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int dista
     uint8_t tipo = (uint8_t)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
     uint16_t rObs = (uint16_t)distanciaX;         //Distancia medida por el sharp si aplica
     uint16_t alphaObs = (uint16_t)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
-
-    runningTime(RTC->MODE0.COUNT.reg);serialPrint("enviado;");serialPrint(rf69_manager.thisAddress());serialPrint(";");serialPrint(poseX);serialPrint(";");serialPrint(poseY);
-    serialPrint(";");serialPrint(rotacion);serialPrint(";");serialPrint(tipoSensorX);
-    serialPrint(";");serialPrint(distanciaX);serialPrint(";");serialPrintln(anguloX);
 
     //Construyo mensaje (es una construcción bastante manual que podría mejorar)
     ptrMensaje = (uint16_t*)&xP;       //Utilizo el puntero para extraer la información del dato flotante.
@@ -282,7 +300,6 @@ inline bool RTCisSyncing() {
 
 void sincronizacion() {
   while (!timeReceived) { //Espera mensaje de sincronización de la base
-
     if (rf69.available()){                                                        // Espera a recibir un mensaje
       uint8_t len = sizeof(buf);                                                  //Obtengo la longitud máxima del mensaje a recibir
       timeStamp1 = RTC->MODE0.COUNT.reg;
@@ -297,7 +314,6 @@ void sincronizacion() {
 
         serialPrintln("¡Reloj del máster clock recibido!");
         timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
-        //Wire.onReceive(RecibirI2C);
       }
     }
   }
@@ -357,7 +373,7 @@ void RTCresetRemove() {
 
 void RTC_Handler(void) {
   //Vector de interrupción.
-  if (RTC->MODE0.COUNT.reg > 0x00000064 && timeReady == false) {      //Si el valor del contador es mayor a 0x64 (100 en decimal) entonces haga la interrupción. Esto para evitar el problema que la interrupción se llame al puro inicio. No sé por qué pasaba esto, investigar más el tema.
+  if (RTC->MODE0.COUNT.reg > 0x00000064 && mensajeCreado == true) {      //Si el valor del contador es mayor a 0x64 (100 en decimal) entonces haga la interrupción. Esto para evitar el problema que la interrupción se llame al puro inicio. No sé por qué pasaba esto, investigar más el tema.
     RTC->MODE0.COMP[0].reg += tiempoCicloTDMA;  //Quiero que haga una interrupción en el próximos ciclo del TDMA, actualizo el nuevo valor a comparar.  **¿Por qué debo agregar el [0]?**
     while (RTCisSyncing());                     //Llamo a función de escritura.
 

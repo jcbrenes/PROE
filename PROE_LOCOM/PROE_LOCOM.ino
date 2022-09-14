@@ -275,7 +275,7 @@ void setup() {
   pinMode(BIN1, OUTPUT);
   pinMode(BIN2, OUTPUT);
   //pinMode(INT_OBSTACULO, INPUT_PULLUP);
-  pinMode(INT_OBSTACULO,OUTPUT);
+  pinMode(INT_OBSTACULO,OUTPUT); // Se puede borrar
   pinMode(ENC_DER_C1, INPUT); 
   pinMode(ENC_DER_C2, INPUT); 
   pinMode(ENC_IZQ_C1, INPUT);
