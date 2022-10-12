@@ -103,7 +103,7 @@ void sincronizar(){
   uint32_t* ptrReloj;  
   ptrReloj = (uint32_t*)&timeStamp1;       //Utilizo el puntero para extraer la información del dato flotante.
   
-  for(uint8_t i = 0; i < 4; i++){
+  for(uint8_t i = 0; i < 3; i++){
     reloj[i] = *ptrReloj >> i*8;  //La parte de "(255UL << i*8)) >> i*8" es solo para ir acomodando los bytes en el array de envío mensaje[].
   }
   rf69_manager.sendto(reloj, sizeof(reloj), RH_BROADCAST_ADDRESS);     //Enviar valor del RTC al esclavo

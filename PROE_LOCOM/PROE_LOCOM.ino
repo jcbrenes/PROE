@@ -190,6 +190,7 @@ unsigned long tiempoPrev = 0;
 float gir_ang_zPrev, vel_y_Prev; //angulos previos para determinar el desplazamiento angular
 float gx_off, gy_off, gz_off, acx_off, acy_off, acz_off; // offsets para calibración del MPU6050
 float ayft, gzft;
+float filtroMPU = 0.90;
 
 //Variables de calibración para magnetometro 
 const int numSamples=2000;
@@ -269,7 +270,7 @@ void setup() {
   attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2_2,CHANGE);
   attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
   
-  //temporización y varibales aleatorias
+  //temporización y variables aleatorias
   tiempoActual=millis(); //para temporización de los ciclos
   tiempoMaquinaEstados= micros();
   tiempoPollingPeri= micros();
@@ -614,13 +615,15 @@ void RecorrerObstaculos(){
     }
     
     else{
-      if(minEnviado>0){
+      if(minEnviado>=0){
         minEnviado = minEnviado -1;
       }
     }
       
-    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
+    //CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
     //CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], datosSensores[ultimoObstaculo][3], datosSensores[ultimoObstaculo][4], datosSensores[ultimoObstaculo][5]); //Enviar solo ultimo obstaculo para debugging
+    //CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], int(ultimoAngMagnet), datosSensores[minEnviado][4], datosSensores[minEnviado][5]);
+    CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], int(ultimoAngMagnet), 0, 0); //Enviar solo ultimo obstaculo para debugging
    }
 }
 
@@ -649,8 +652,11 @@ void ActualizarUbicacionReal() {
   }
 
   //Calcular nueva posición basado en la distancia y el angulo en que se movio (convertir coordenadas polares a rectangulares)
-  poseActual[0] = poseActual[0] + (distanciaAvanzada * cos(orientacion)); //coordenada X
-  poseActual[1] = poseActual[1] + (distanciaAvanzada * sin(orientacion)); //coordenada Y
+  poseActual[0] = (int)(poseActual[0] + (distanciaAvanzada * cos(orientacion))); //coordenada X
+  poseActual[1] = (int)(poseActual[1] + (distanciaAvanzada * sin(orientacion))); //coordenada Y
+  /*Serial.print("X: "); Serial.print(poseActual[0]);
+  Serial.print(", Y: "); Serial.print(poseActual[1]);
+  Serial.print(", pose2: "); Serial.println(poseActual[2]);*/
 
 }
 
@@ -1530,10 +1536,41 @@ void guardarDatoFloat(float dato, int dirPagInicial) {
 
 void origenMagnet(){ //Mide la orientación y guarda un promedio
   float x=0;
-  for(int i=0; i<25; i++){ //Medir orientacion con el magnetometro 25 veces y sacar un promedio
+  for(int i=0; i<100; i++){ //Medir orientacion con el magnetometro 25 veces y sacar un promedio
     x = x + medirMagnet();
+    delay(5);
   }
-  magInicioOrigen = x/25;
+  magInicioOrigen = x/100;
+}
+
+bool testMagnet(){ //Verifica que el magnetometro este midiendo datos y la comunicación es correcta
+  float y[10]={0};
+  int i=0;
+  float min=0, max=0;
+
+  for(i=0; i<10; i++){
+    y[i]=medirMagnet();
+    delay(5);
+  }
+
+  max=y[0];
+  min=y[0];
+
+  for(i=0; i<10; i++){
+    if(y[i]<min){
+      min=y[i];
+    }
+    else if(y[i]>max){
+      max=y[i];
+    }
+  }
+
+  if((max-min)>0.5){//Ver si la diferencia entre max y min es mayor a 0.5 para ver que si está recibiendo ruido y tomar eso como que el mag está midiendo correctamente
+    return true;
+  }
+  else{
+    return false;
+  }
 }
 
 void inicializaMagnet() {
@@ -1557,6 +1594,12 @@ void inicializaMagnet() {
   yoff = leerDatoFloat(4);
   angElips = leerDatoFloat(8);
   factorEsc = leerDatoFloat(12);
+
+  //Prueba magnetometro
+  while(!testMagnet()){
+    Serial.println("Fallo prueba magnetometro");
+    delay(1000);
+  }
 
   //Obtiene el valor inicial de ángulo
   origenMagnet();
@@ -1611,7 +1654,7 @@ float medirMagnet() {
   if (angulo < 0.0) {
     angulo = angulo + 360;
   }
-  
+
   return angulo;
 }
 
@@ -1770,8 +1813,8 @@ void leeMPU(float &gir_ang_z, float &vely) {
   gz = (float(gyro_z) - gz_off) / G_R;
 
   //Filtro, aun no se está usando, si se desear usar, cambiar 1 por 0.05
-  ayft = ay * 1 + (1 - 1) * ayft;
-  gzft = gz * 1 + (1 - 1) * gzft;
+  ayft = ay * filtroMPU + (1 - filtroMPU) * ayft;
+  gzft = gz * filtroMPU + (1 - filtroMPU) * gzft;
 
   gir_ang_z = gzft * (dt / 1000000.0) + gir_ang_zPrev;
   vely = ayft * (dt / 1000000.0);
