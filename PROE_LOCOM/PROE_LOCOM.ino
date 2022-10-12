@@ -1756,6 +1756,54 @@ void RTC_Handler(void) {
   }
 }
 
+bool testMPU() {
+//Funcion que extrae los datos crudos del MPU, los calibra y calcula desplazamiento angulares
+  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos
+  int i=0;
+  int16_t lista[10]={0};
+  int16_t max, min;
+  
+  for(i=0; i<10; i++){
+    segundoI2C.beginTransmission(0x68);   //empieza a comunicar con el mpu6050
+    segundoI2C.write(0x3B);   //envia byte 0x43 al sensor para indicar startregister
+    segundoI2C.endTransmission();   //termina comunicacion
+    segundoI2C.requestFrom(0x68, 14); //pide 6 bytes al sensor, empezando del reg 43 (ahi estan los valores del giro)
+
+    if (14 <= segundoI2C.available()) {
+      ac_x = segundoI2C.read() << 8 | segundoI2C.read();
+      ac_y = segundoI2C.read() << 8 | segundoI2C.read();
+      ac_z = segundoI2C.read() << 8 | segundoI2C.read();
+    
+      tmp = segundoI2C.read() << 8 | segundoI2C.read();
+    
+      gyro_x = segundoI2C.read() << 8 | segundoI2C.read(); //combina los valores del registro 44 y 43, desplaza lo del 43 al principio
+      gyro_y = segundoI2C.read() << 8 | segundoI2C.read();
+      gyro_z = segundoI2C.read() << 8 | segundoI2C.read();
+    }
+
+    lista[i]=ac_y;
+    delay(100);
+  }
+
+  max=lista[0];
+  min=lista[0];
+
+  for(i=0; i<10; i++){
+    if(lista[i]<min){
+      min=lista[i];
+    }
+    else if(lista[i]>max){
+      max=lista[i];
+    }
+  }
+
+  if((max-min)>1){//Ver si la diferencia entre max y min es mayor a 0.5 para ver que si está recibiendo ruido y tomar eso como que está midiendo correctamente
+    return true;
+  }
+  else{
+    return false;
+  }
+}
 
 void inicializarMPU() {
 //Inicializa la comunicación con el MPU
@@ -1771,6 +1819,12 @@ void inicializarMPU() {
   acx_off = leerDatoFloat(28);
   acy_off = leerDatoFloat(32);
   acz_off = leerDatoFloat(36);
+
+  //Prueba magnetometro
+  while(!testMPU()){
+    Serial.println("Fallo prueba MPU");
+    delay(1000);
+  }
 }
 
 void resetVarMPU(){
