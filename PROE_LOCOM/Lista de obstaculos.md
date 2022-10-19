@@ -10,7 +10,8 @@ Distribución de los mensajes:
 	- Distancia a obstaculo: para sensor sharp
 	- Ángulo de obstaculo: para sensor sharp
 
-El tipo de mensaje indica a que se refiere el resto de la información en el mensaje
+El tipo de mensaje indica a que se refiere el resto de la información en el mensaje.
+
 Lista de tipos de mensajes que se van a recibir en la base:
 - 0: Identifica posición sin obstaculo
 - 1: Sharp, da medida de distancia y ángulo
