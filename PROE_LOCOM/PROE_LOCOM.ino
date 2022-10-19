@@ -620,10 +620,8 @@ void RecorrerObstaculos(){
       }
     }
       
-    //CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
+    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
     //CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], datosSensores[ultimoObstaculo][3], datosSensores[ultimoObstaculo][4], datosSensores[ultimoObstaculo][5]); //Enviar solo ultimo obstaculo para debugging
-    //CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], int(ultimoAngMagnet), datosSensores[minEnviado][4], datosSensores[minEnviado][5]);
-    CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], int(ultimoAngMagnet), 0, 0); //Enviar solo ultimo obstaculo para debugging
    }
 }
 
@@ -654,10 +652,6 @@ void ActualizarUbicacionReal() {
   //Calcular nueva posición basado en la distancia y el angulo en que se movio (convertir coordenadas polares a rectangulares)
   poseActual[0] = (int)(poseActual[0] + (distanciaAvanzada * cos(orientacion))); //coordenada X
   poseActual[1] = (int)(poseActual[1] + (distanciaAvanzada * sin(orientacion))); //coordenada Y
-  /*Serial.print("X: "); Serial.print(poseActual[0]);
-  Serial.print(", Y: "); Serial.print(poseActual[1]);
-  Serial.print(", pose2: "); Serial.println(poseActual[2]);*/
-
 }
 
 void DeteccionObstaculo(){
