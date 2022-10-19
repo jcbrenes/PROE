@@ -176,6 +176,10 @@ int anguloGiro = 0;
 //Variables para el magnetómetro y su calibración
 const float declinacionMag = 0.0; //correccion del campo magnetico respecto al norte geográfico en Costa Rica
 const float alfa = 0.8; //constante para filtro de datos
+short x, y, z;  //Valores crudos del magnetometro
+float xof, yof, xrot, yrot, xf, yf; //Variables de funcion medirMagnet
+int cuentaMagnetError=0; //Cuenta de error del magnetometro
+bool magnetError=false; //Bandera de error de magnetometro
 float xft=0; //Valores filtrados
 float yft=0;
 float xoff = 0; //offset de calibración en x
@@ -189,7 +193,12 @@ float orientacion=0; //Usado en ActualizarUbicacion
 unsigned long tiempoPrev = 0;
 float gir_ang_zPrev, vel_y_Prev; //angulos previos para determinar el desplazamiento angular
 float gx_off, gy_off, gz_off, acx_off, acy_off, acz_off; // offsets para calibración del MPU6050
-float ayft, gzft;
+float ayft, azft, gzft;
+int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos del MPU
+float gz, ay; //guardan los valores reales de aceleración y velocidad angular
+long dt; //delta de tiempo para calcular desplazamiento angular
+int cuentaMPUerror = 0;  //Cuenta de error del MPU
+bool mpuError = false;  //Bandera de error del MPU
 float filtroMPU = 0.90;
 
 //Variables de calibración para magnetometro 
@@ -368,6 +377,21 @@ void loop(){
     ultimoAngMagnet= medirMagnet(); //medición de la orientación con el magnetómetro
     detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
     leeMPU(anguloMPU,velMPU); //medición del MPU
+
+    //Pruebas de perifericos conectados a los buses I2C
+    if(magnetError){
+      ConfiguracionParar();
+      CrearObstaculo(40,0,0);
+      Serial.println("Magnet Error");
+      return;
+    }
+
+    if(mpuError){
+      ConfiguracionParar();
+      CrearObstaculo(41,0,0);
+      Serial.println("MPU Error");
+      return;
+    }
 
     //Máquina de estados que cambia el modo de operación
     switch (estado) {
@@ -1603,26 +1627,36 @@ float medirMagnet() {
   //Funcion que extrae los datos crudos del magnetometro, carga los valores de calibracion
   //adicionalmente usa un filtro para la toma de datos (media movil)
   //retorna el angulo en un rango de [0,360]
-  short x, y, z;
-  float xof, yof, xrot, yrot, xf, yf;
+
   //establece comunicación con el magnetómetro
-    
-    segundoI2C.beginTransmission(dirMag);
-    segundoI2C.write(0x00); //start with register 3.
-    segundoI2C.endTransmission();
-    //Pide 6 bytes del registro del magnetometro
-    segundoI2C.requestFrom(dirMag, 6);
-    if (6 <= segundoI2C.available()) {
-      x = segundoI2C.read(); //LSB  x
-      x |= segundoI2C.read() << 8; //MSB  x
-      y = segundoI2C.read(); //LSB  y
-      y |= segundoI2C.read() << 8; //MSB y
-      z = segundoI2C.read(); //LSB z
-      z |= segundoI2C.read() << 8; //MSB z
+  
+  segundoI2C.beginTransmission(dirMag);
+  segundoI2C.write(0x00); //start with register 3.
+  segundoI2C.endTransmission();
+  //Pide 6 bytes del registro del magnetometro
+  segundoI2C.requestFrom(dirMag, 6);
+  if (6 <= segundoI2C.available()) {
+    x = segundoI2C.read(); //LSB  x
+    x |= segundoI2C.read() << 8; //MSB  x
+    y = segundoI2C.read(); //LSB  y
+    y |= segundoI2C.read() << 8; //MSB y
+    z = segundoI2C.read(); //LSB z
+    z |= segundoI2C.read() << 8; //MSB z
+  }
+
+  //Prueba continua, verifica que existe ruido en los datos de la coordenada X, si el magnetometro falla el dato recibido va a ser constante
+  if (abs(x-xft)<0.1){
+    cuentaMagnetError++;
+    if(cuentaMagnetError>20){ //Si la prueba falla 20 veces se determina que el magnetometro fallo
+      magnetError=true;
+      //Serial.println("Magnet Error");
+      return 0.0;
     }
-    //Se puede hacer un filtro de media entre los datos
-    xft = x * alfa + (1 - alfa) * xft;
-    yft = y * alfa + (1 - alfa) * yft;
+  }
+
+  //Se puede hacer un filtro de media entre los datos
+  xft = x * alfa + (1 - alfa) * xft;
+  yft = y * alfa + (1 - alfa) * yft;
 
   //***Corrección con los datos de calibración  
   //Sustrae los offset
@@ -1829,9 +1863,6 @@ void resetVarMPU(){
 
 void leeMPU(float &gir_ang_z, float &vely) {
 //Funcion que extrae los datos crudos del MPU, los calibra y calcula desplazamiento angulares
-  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos
-  float gz, ay; //guardan los valores reales de aceleración y velocidad angular
-  long dt; //delta de tiempo para calcular desplazamiento angular
   if (tiempoPrev == 0) {
     tiempoPrev = micros();
   }
@@ -1851,6 +1882,18 @@ void leeMPU(float &gir_ang_z, float &vely) {
     gyro_y = segundoI2C.read() << 8 | segundoI2C.read();
     gyro_z = segundoI2C.read() << 8 | segundoI2C.read();
   }
+
+  //Prueba continua, verifica que existe ruido en los datos, usa ac_z
+  if (abs(ac_z-azft)<0.1){
+    cuentaMPUerror++;
+    if(cuentaMPUerror>20){ //Si la prueba falla 20 veces se determina que el magnetometro fallo
+      mpuError=true;
+    }
+  }
+  else if(cuentaMPUerror>0){
+    cuentaMPUerror--;
+  }
+  azft=ac_z;
   
   unsigned long tiempoYaMicros= micros();
   dt =  tiempoYaMicros - tiempoPrev;
