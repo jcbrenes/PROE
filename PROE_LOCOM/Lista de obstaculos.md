@@ -1,7 +1,7 @@
 # Lista de mensajes
 
 Distribución de los mensajes:
-	Los mensajes se componen de 7 valores separados por ";" y el orden de lectura es:
+- Los mensajes se componen de 7 valores separados por ";" y el orden de lectura es:
 	- ID: número de identificación del robot
 	- Coordenada X
 	- Coordenada Y
