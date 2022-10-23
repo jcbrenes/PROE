@@ -20,8 +20,26 @@
 #endif
 
 //Variables del enjambre para la comunicación a la base
-uint8_t cantidadRobots = 2; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+const uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+unsigned long idRobot = 3; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+
+// Variables para el proceso de arranque y transformación de coordenadas
+int distCoordenadas; //Distancia inicial de los robot 
+bool datoCoordenadas = false; // Primer dato STM32 es la distancia entre robots
+int matTransformation[int(cantidadRobots)]; // Arreglo utilizao para transformar las coordenadas de los robots.
+int cantPaquetesDistanciaEnviados = 0; //Variable para contar la cantidad de paquetes que envia con la medición inicial
+int cantPaquetesDistanciaPorEnviar = 5; // Cantidad de paquetes a enviar para la medición inicial.
+int posicionXAvanzarCoordenada = 0; // Posicion X a la que va a avanzar el robot en la funcion avanzarCoordenada
+int posicionYAvanzarCoordenada = 0; // Posicion Y a la qu va a avanzar el robot en la funcion avanzarCoordenada
+int errorAvanzarCoordenada = 30; // Error que se permita de la posicion XY de la funcion avanzarCoordenada
+
+// Variables recibidas por los otros Atta-Bots
+int16_t posXRecibido;
+int16_t posYRecibido;
+int16_t rotRecibido;
+int8_t tipSensRecibido;
+int16_t disRecibido;
+int16_t anguloRecibido;
 
 //constantes del robot empleado
 const int tiempoMuestreo=100000; //unidades: micro segundos
@@ -35,7 +53,7 @@ const float conversionMicroSaSDiv=1000000;// factor de conversion microsegundo (
 const float tiempoMuestreoS= (float)tiempoMuestreo/conversionMicroSaSDiv;
 
 //constantes para control PID movimiento lineal para tiempoMuestreo=100000 us
-const float velRequerida=170.0; //unidades mm/s
+const float velRequerida=120.0; //unidades mm/s
 const float KpVel=0.4; //constante control proporcional
 const float KiVel=0.65; //constante control integral
 const float KdVel=0.0; //constante control derivativo
@@ -46,9 +64,9 @@ const float KiGiro=1.1;//constante control integral
 const float KdGiro=0.17; //constante control derivativo
 
 //constantes para control PID de la pose del robot 
-const float KpPose=1; //constante control proporcional
+const float KpPose=1.0; //constante control proporcional
 const float KdPose=0.0; //constante control derivativo
-const float KiPose=1.0; //constante control derivativo
+const float KiPose=0.0; //constante control derivativo
 const float velBase=120.0; //unidades mm/s
 
 //Constantes para la implementación del control PID real
@@ -114,6 +132,9 @@ enum PosiblesEstados {AVANCE=0, RETROCEDA, GIRE_DERECHA, GIRE_IZQUIERDA, ESCOGER
 //char const *PosEstados[] = {"AVANCE", "RETROCEDA", "GIRE_DERECHA", "GIRE_IZQUIERDA","ESCOGER_DIRECCION","GIRO", "NADA"};
 PosiblesEstados estado = AVANCE;
 
+bool banderaParar = false; // Detiene todo avance del robot
+
+
 //variable que almacena el tiempo del último ciclo de muestreo
 unsigned long tiempoActual = 0;
 unsigned long tiempoMaquinaEstados = 0;
@@ -148,7 +169,8 @@ float sumErrorVelDer = 0;
 float sumErrorVelIzq = 0;
 
 //Para Coordenadas
-float errorAnteriorOrientacion = 0;
+float errorAnt_1_Orientacion = 0;
+float errorAnt_2_Orientacion = 0;
 float sumErrorOrientacion = 0;
 float distLinealRuedaDerecha = 0;
 float distLinealRuedaIzquierda = 0;
@@ -162,7 +184,7 @@ byte estadoEncoderDer = 1;
 byte estadoEncoderIzq = 1;
 
 //Variables para el almacenar datos de obstáculos
-int datosSensores[longitudArregloObstaculos][6]; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
+int datosSensores[longitudArregloObstaculos][6] = {0}; //Arreglo que almacena la información de obstáculos de los sensores (tipo sensor, distancia, ángulo)
 int ultimoObstaculo = -1; //Apuntador al último obstáculo en el arreglo. Se inicializa en -1 porque la función de guardar aumenta en 1 el índice
 int minEnviado = 0; //Almacena el recorrido de la lista de obstaculos
 bool nuevoObstaculo = false; //Bandera verdadera cuando se detecta un nuevo obstaculo
@@ -170,11 +192,13 @@ unsigned long tiempoSTM = 0; //Almacena el tiempo de muestreo del STM
 int limiteObstaculos=unidadAvance/10; //Distancia minima que el robot debe moverse para olvidar los obstaculos detectados hasta ese momento, para random walk con memoria
 bool resetObstaculos=false; //Bandera que permite reiniciar los obstaculos detectados en loop principal para no afectar tiempos de movimiento
 
-
 //Variables para el algoritmo de exploración
 int distanciaAvanzada = 0;
-int poseActual[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación.
-float poseActualF[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación (grados).
+float poseActual[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación.
+float anguloOrientacion = 0; // Variable que guarda la orientacion actual del robot en cada momento
+float tempOrientacionGiroscopio = 0; // Variable para obtener la orientacion del giroscopio
+float avanceRealizado = 0; // Avance que el robot realiza en cada intervalo de tiempo
+float errorOrientacion = 0; // Se utiliza para la funcion avanzar coordenada
 bool giroTerminado = 1; //Se hace esta variable global para saber cuando se está en un giro y cuando no
 bool obstaculoAdelante = false;
 bool obstaculoDerecha = false;
@@ -197,6 +221,8 @@ float factorEsc = 1; //factor para convertir el elipsoide en una circunferencia
 float magInicioOrigen=0; //valor de orientación inicial
 float orientacion=0; //Usado en ActualizarUbicacion
 
+
+
 //Variables para el MPU6050 y su calibración
 unsigned long tiempoPrev = 0;
 float gir_ang_zPrev, vel_y_Prev; //angulos previos para determinar el desplazamiento angular
@@ -210,6 +236,13 @@ short puntosCalibracion=0; //Contadores para calibración
 short maxX=0,minX=0,maxY=0,minY=0; // Maximos y minimos de los datos
 float uXX=0,uYY=0,uXY=0; //Momentos de inercia
 float angulo=0; //Angulo de rotación de los datos
+
+// Filtro de kalman
+const float R = 80; // Valor R filtro de Kalman
+const float H = 1.00; // Valor de ganancia filtro de Kalman
+const float Q = 5; // Valor Q filtro de Kalman
+static float P = 0; // Valor de ajuste de Kalman
+static float K = 0; // Valor ganancia K de Kalman
 
 bool cal_mag=0;
 bool cal_mpu=0;
@@ -231,7 +264,7 @@ RHDatagram rf69_manager(rf69, MY_ADDRESS);
 
 //Variables para el mensaje que se va a transmitir a la base
 bool timeReceived = false; //Bandera para saber si ya recibí el clock del máster.
-unsigned long tiempoRobotTDMA = 20; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
+unsigned long tiempoRobotTDMA = 30; //Slot de tiempo que tiene cada robot para hablar. Unidades ms.
 unsigned long tiempoCicloTDMA = cantidadRobots * tiempoRobotTDMA; //Duración de todo un ciclo de comunicación TDMA. Unidades ms.
 unsigned long timeStamp1; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene apenas se recibe el reloj.
 unsigned long timeStamp2; //Estampa de tiempo para eliminar el desfase por procesamiento del reloj al recibirse. Se obtiene al guardar en memoria el reloj.
@@ -259,11 +292,8 @@ bool complemento=false;
 bool cambio12=false;
 bool cambio21=false;
 
-
 int c = 0; //Contador para led 13
 int b = 0;
-
-
 
 void setup() {
   //asignación de pines
@@ -297,7 +327,7 @@ void setup() {
   
   //***Inicialización de puertos seriales***
   if (debug == 1){
-    Serial.begin(9600); //Puerto serie para comunicación con la PC
+    Serial.begin(115200); //Puerto serie para comunicación con la PC
   }
   Wire.begin(); //Puerto I2C para hablar con el STM32. Feather es master
   Wire.setClock(400000); //Velocidad del bus en Fast Mode
@@ -358,50 +388,68 @@ void setup() {
   RTCenable();                          //Habilito de nuevo el RTC.
   RTCresetRemove();                     //Quito el reset del RTC.
 
-  Serial.println("¡RFM69 radio en funcionamiento!");
+  //Serial.println("¡RFM69 radio en funcionamiento!");
   delay(1000);
 
-  //******En caso de usar el robot solo (no como enjambre), comentar la siguiente linea
+  leerMsgSTM();
+
+  //******En caso de usar el robot solo (no como enjambre), comentar las dos siguiente lineas
   sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
+  transformation(); // Proceso de transformación de coordenadas
 
   //descomentar la siguiente linea si se quiere llevar el robot a cierta coordenada
   //estado = CONTROL_POSE;
-    
 }
 
 void loop(){
   //***POLLING*** Acciones que se ejecutan periodicamente. Más frecuentemente que la máquina de estados
   RecorrerObstaculos();
 
-  if (rf69_manager.available()){
+  if (rf69_manager.available() && estado != CONTROL_POSE){ // Cuando los robot se agrupan evita que reciba mensajes
     if (rf69_manager.recvfrom(buf, &len, &from)){
       buf[len] = 0;
-      serialPrint(from);serialPrint("; ");serialPrint(*(int16_t*)&buf[0]);serialPrint("; ");serialPrint(*(int16_t*)&buf[2]);
-      serialPrint("; ");serialPrint(*(int16_t*)&buf[4]);serialPrint("; ");serialPrint((int8_t)buf[6]);
-      serialPrint("; ");serialPrint(*(int16_t*)&buf[7]);serialPrint("; ");serialPrintln(*(int16_t*)&buf[9]);
+      posXRecibido = *(int16_t*)&buf[0];
+      posYRecibido = *(int16_t*)&buf[2];
+      rotRecibido = *(int16_t*)&buf[4];
+      tipSensRecibido = (int8_t)buf[6];
+      disRecibido = *(int16_t*)&buf[7];
+      anguloRecibido = *(int16_t*)&buf[9];
+      serialPrint(from);serialPrint("; ");serialPrint(posXRecibido);serialPrint("; ");serialPrint(posYRecibido);
+      serialPrint("; ");serialPrint(rotRecibido);serialPrint("; ");serialPrint(tipSensRecibido);
+      serialPrint("; ");serialPrint(disRecibido);serialPrint("; ");serialPrintln(anguloRecibido);
+    }
+    if(tipSensRecibido == 5){ // Activa que los robot se agrupen, en caso de no ocuparse comentar
+      posicionXAvanzarCoordenada = posXRecibido;
+      posicionYAvanzarCoordenada = posYRecibido + matTransformation[from];
+      estado = CONTROL_POSE;
     }
   }
 
   //***MAQUINA DE ESTADOS*** Donde se manejan los comportamientos del robot y el control PID
   //Las acciones de la máquina de estados y los controles se efectuarán en tiempos fijos de muestreo
+  if (banderaParar){ // Detiene el robot por completo
+    estado = NADA;
+    ConfiguracionParar();
+  }
   if((micros()-tiempoMaquinaEstados)>=tiempoMuestreo){
     tiempoMaquinaEstados=micros();
     tiempoActual=millis();//tomo el tiempo actual (para reducir las llamadas a millis)
 
     //Polling de perifericos conectados a los buses I2C
     leerMsgSTM(); //lectura de obstáculo en el STM
-    ultimoAngMagnet= medirMagnet(); //medición de la orientación con el magnetómetro
+    ultimoAngMagnet = medirMagnet(); //medición de la orientación con el magnetómetro
     detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
     leeMPU(anguloMPU,velMPU); //medición del MPU
+
+    actualizarUbicacion(); // Actualiza constantemente las coordenadas XY del robot
 
     //Máquina de estados que cambia el modo de operación
     switch (estado) {
 
       case AVANCE:  { 
-        bool avanceTerminado= AvanzarDistancia(unidadAvance); 
-        //bool avanceTerminado= true; 
+        bool avanceTerminado = AvanzarDistancia(unidadAvance); 
+        //bool avanceTerminado= true;
         if (avanceTerminado){
-          ActualizarUbicacionReal(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
           ConfiguracionParar(); 
           CrearObstaculo(0,0,0); //Si completa el avance crea un obstaculo 0 para indicar que no encontro obstaculos
           estado = ESCOGER_DIRECCION;
@@ -418,7 +466,6 @@ void loop(){
         }
         
         if (retrocesoTerminado){
-          ActualizarUbicacionReal(); //Actualiza la ubicación actual en base al avance anterior y la orientación actual
           ConfiguracionParar();
           estado = ESCOGER_DIRECCION; 
         }   
@@ -439,7 +486,7 @@ void loop(){
         if   (giroTerminado) {
           ConfiguracionParar(); //detiene el carro un momento
           estado = GIRE_DERECHA;
-        }        
+        }
         break; 
       }
       
@@ -452,14 +499,13 @@ void loop(){
         if(estado!=GIRO){ //Si no se encontraba en giro almacenar el tiempoGiro
           tiempoGiro=millis(); //Almacena el tiempo cuando se cambio a giro para comparar con el limite
         }
-        
         estado= GIRO;
         break;
       }
 
       case GIRO: {
         giroTerminado=Giro((float)anguloGiro);
-
+        //giroTerminado=Giro(90);
 
         if ((millis() - tiempoGiro) > limiteGiro){ //Si pasa mas del limite de tiempo tratando de girar se detiene y lo trata como si hubiera completado el giro, evita que se quede intentando girar si está bloqueado
           giroTerminado = true;
@@ -467,40 +513,22 @@ void loop(){
         
         if(giroTerminado){
           ConfiguracionParar();
-          //Serial.print("Giro real: "); Serial.println(angActualRobot);
+          //serialPrint("Giro real: "); serialPrintln(angActualRobot);
           estado=AVANCE;
         }
         break;
       }
 
       case CONTROL_POSE: {
-        if (!corregirOrientacion){
-          if (!finPose){
-            Serial.println("---------------------------------");
-            finPose = AvanzarCoordenada(900, 900, 10); //coordenada x, coordenada y, error permitido, todo en mm
-            Serial.println(finPose);
-            Serial.println("---------------------------------");
-            break;
-          }
-          else {
-            ConfiguracionParar();
-            corregirOrientacion = true;
-          }
+        //finPose = AvanzarCoordenada(-300, -1000, errorAvanzarCoordenada); //coordenada x, coordenada y, error permitido, todo en mm
+        finPose = AvanzarCoordenada(posicionXAvanzarCoordenada, posicionYAvanzarCoordenada, errorAvanzarCoordenada); //coordenada x, coordenada y, error permitido, todo en mm
+        if (finPose){
+          CrearObstaculo(15, 0, 0);
+          ConfiguracionParar();
+          banderaParar = true;
         }
-
-        else{
-          float orientacionDeseada = 135; //si se desea controlar la orientacion usar esta linea y comentar la siguiente
-          //float orientacionDeseada = poseActualF[2]; //si no se desea controlar orientacion descomentar esta linea
-          giroTerminado= Giro(orientacionDeseada - poseActualF[2]);
-          if   (giroTerminado) {
-            ConfiguracionParar();
-            finPose = false;
-            corregirOrientacion = false;
-            estado = NADA;
-          }
-        }
-         break;
-        }
+        break;
+      }
 
       case NADA: {
         break;
@@ -546,6 +574,9 @@ void leerMsgSTM ()  {
   if (tipoSensor>0){ //Si el sensor sigue en 0 significa que el STM no envió nada
     CrearObstaculo(tipoSensor, distancia, angulo);
     resetObstaculos=false;
+    if (tipoSensor == 5){ // Si recibe una señal de temperatura detiene el robot en el lugar
+      banderaParar = true;
+    }
   }
 
   else if(tipoSensor==-1){ //Si llega tipoSensor==-1 significa que el interruptor está encendido, se va a usar para pedir calibración
@@ -562,9 +593,11 @@ void CrearObstaculo(int tipoSensor, int distancia, int angulo){
     ultimoObstaculo++;
   }
   //Guarda la pose actual donde se detectó el obstáculo y el tipo y detalles del obstáculo
-  datosSensores[ultimoObstaculo][0] = poseActual[0]; //Pose X
-  datosSensores[ultimoObstaculo][1] = poseActual[1]; //Pose Y
-  datosSensores[ultimoObstaculo][2] = poseActual[2]; //Orientacion respecto al inicio
+  
+  datosSensores[ultimoObstaculo][0] = int(poseActual[0]); //Pose X
+  datosSensores[ultimoObstaculo][1] = int(poseActual[1]); //Pose Y
+  datosSensores[ultimoObstaculo][2] = int(poseActual[2]); //Orientacion respecto al inicio
+
   datosSensores[ultimoObstaculo][3] = tipoSensor;
   datosSensores[ultimoObstaculo][4] = distancia;
   datosSensores[ultimoObstaculo][5] = angulo;
@@ -593,10 +626,6 @@ void CrearMensaje(int poseX, int poseY, int rotacion, int tipoSensorX, int dista
     uint8_t tipo = (uint8_t)tipoSensorX;        //Tipo de sensor que se detecto (Sharp, IR Fron, IR Der, IR Izq, Temp, Bat)
     uint16_t rObs = (uint16_t)distanciaX;         //Distancia medida por el sharp si aplica
     uint16_t alphaObs = (uint16_t)(anguloX);      //Angulo respecto al "norte" (orientación inicial del robot medida por el magnetometro)
-
-    serialPrint(rf69_manager.thisAddress());serialPrint("; ");serialPrint(poseX);serialPrint("; ");serialPrint(poseY);
-    serialPrint("; ");serialPrint(rotacion);serialPrint("; ");serialPrint(tipoSensorX);
-    serialPrint("; ");serialPrint(distanciaX);serialPrint("; ");serialPrintln(anguloX);
 
     //Construyo mensaje (es una construcción bastante manual que podría mejorar)
     ptrMensaje = (uint16_t*)&xP;       //Utilizo el puntero para extraer la información del dato flotante.
@@ -647,19 +676,19 @@ void RecorrerObstaculos(){
         minEnviado = minEnviado -1;
       }
     }
-      
-    CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
-    //CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], datosSensores[ultimoObstaculo][3], datosSensores[ultimoObstaculo][4], datosSensores[ultimoObstaculo][5]); //Enviar solo ultimo obstaculo para debugging
+    
+    //CrearMensaje(datosSensores[minEnviado][0], datosSensores[minEnviado][1], datosSensores[minEnviado][2], datosSensores[minEnviado][3], datosSensores[minEnviado][4], datosSensores[minEnviado][5]); //Enviar lista de últimos obstaculos
+    CrearMensaje(datosSensores[ultimoObstaculo][0], datosSensores[ultimoObstaculo][1], datosSensores[ultimoObstaculo][2], datosSensores[ultimoObstaculo][3], datosSensores[ultimoObstaculo][4], datosSensores[ultimoObstaculo][5]); //Enviar solo ultimo obstaculo para debugging
    }
 }
 
-
+/// @brief Actualiza la ubicación del robot
 void ActualizarUbicacionReal() {
   //Función que actualiza la ubicación actual en base al avance anterior y la orientación actual dada por el magnetometro
 
   orientacion = (float)(ultimoAngMagnet - magInicioOrigen); //Orientacion del robot
   if(orientacion > 180){ //Correción para tener valores entre -180 y 180
-    orientacion = orientacion - 360;          
+    orientacion = orientacion - 360;
   }
   else if(orientacion < -180){
     orientacion = orientacion + 360;
@@ -683,18 +712,25 @@ void ActualizarUbicacionReal() {
 
 }
 
+/// @brief Interrupción que realiza el STM32
 void DeteccionObstaculo(){
-//Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
-//Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
+  //Función tipo interrupción llamada cuando se activa el pin de detección de obstáculo del STM32
 
-  if(estado!=RETROCEDA && giroTerminado==1 && tiempoActual>2000){
-    //Solo si el estado ya no es retroceder.  También que no está haciendo un giro 
-    //y para que ignore las interrupciones los primeros segundos al encenderlo
-    estado=RETROCEDA;
-    ActualizarUbicacionReal(); //Como se interrumpió un movimiento, actualiza la ubicación actual
-    ConfiguracionParar(); //Se detiene un momento y reset de encoders 
-    tiempoRetroceso= tiempoActual; //Almacena el ultimo tiempo para usarlo en el temporizador
-  }   
+  // Primero verifica que no esté en el proceso de arranque
+  if (!datoCoordenadas){ // Recibe la distancia del sharp que hay entre el robot y el frente 
+    distCoordenadas = leerDistanciaSTM();
+    serialPrintln(distCoordenadas);
+    datoCoordenadas = true;
+  }else{// Modo normal de operación
+    //Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
+    if(estado!=RETROCEDA && giroTerminado==1 && tiempoActual>2000){
+      //Solo si el estado ya no es retroceder.  También que no está haciendo un giro 
+      //y para que ignore las interrupciones los primeros segundos al encenderlo
+      estado=RETROCEDA;
+      ConfiguracionParar(); //Se detiene un momento y reset de encoders 
+      tiempoRetroceso= tiempoActual; //Almacena el ultimo tiempo para usarlo en el temporizador
+    }
+  }
 }
 
 
@@ -1008,7 +1044,8 @@ bool Giro(float grados) {
 
   float factorFus=0.0;  //Peso de medicion de magnetometro y MPU en el calculo del giro    0.7 anteriormente
   angActualRobot=GiroReal(anguloMPU,anguloInicial,ultimoAngMagnet); //calcula el giro real
-  
+  //angActualRobot=GiroReal(anguloMPU,0,anguloEncoder);
+
   posActualRuedaDerecha = ConvDistAngular(contPulsosDerecha)*(1-factorFus)+factorFus*angActualRobot;
   int cicloTrabajoRuedaDerecha = ControlPosGiroRueda( -grados, posActualRuedaDerecha, sumErrorGiroDer, errorAnteriorGiroDer );
 
@@ -1074,6 +1111,7 @@ void ConfiguracionParar() {
   digitalWrite(BIN1, LOW);
   digitalWrite(BIN2, LOW);
   ResetContadoresEncoders();
+  resetAvance();
   delay(250);
 }
 
@@ -1284,88 +1322,77 @@ void AvanzarIndefinido() {
 
 }
 
+/// @brief Funcion que permite al Atta ir hacia una coordenada en especifico
+/// @param coordenadaXDeseada Posicion X de la posicion deseada
+/// @param coordenadaYDeseada Posicion Y de la posicion deseada
+/// @param errorPermitido Error permitido de la posicion XY del movimiento
+/// @return true cuando se completa el movimiento y false cuando se esta ejecutando el movimiento
 bool AvanzarCoordenada(int coordenadaXDeseada, int coordenadaYDeseada, float errorPermitido) {
+  
+  static float tiempoPrevioCoordenada = 0; // Actualmente no se usa, ganancia integral y derivativa se deben modificar
+  static float tiempoCoordenada = micros(); // Actualmente no se usa, ganancia integral y derivativa se deben modificar
+  static bool finMovimiento = false; // Inicializa la funcion
+  static float controlIntegral = 0; // Variable que almacena el valor integral, ahorita no es funcional
+  static float velocidadAngular = 0; // Velocidad angular del atta
+
+  if (tiempoPrevioCoordenada == 0){
+    tiempoPrevioCoordenada = tiempoMaquinaEstados;
+  }
+  
   //Desplazamiento hasta una coordenada deseada
   //Devuelve true cuando alcanzó la coordenada deseada
 
-  float errorCoordenadaX = coordenadaXDeseada - poseActualF[0];
-  float errorCoordenadaY = coordenadaYDeseada - poseActualF[1];
-  float errorOrientacion = (atan2(errorCoordenadaY,errorCoordenadaX)*(180/ PI)) - poseActualF[2]; //Respuesta en grados
+  float errorCoordenadaX = coordenadaXDeseada - poseActual[0];
+  float errorCoordenadaY = coordenadaYDeseada - poseActual[1];
 
-  bool finMovimiento = false;
+  errorOrientacion = atan2(errorCoordenadaX,errorCoordenadaY) - anguloOrientacion*(PI/180); //Respuesta en radianes
+
+  finMovimiento = false;
   float errorPose = sqrt(pow(errorCoordenadaX,2)+pow(errorCoordenadaY,2));
   //Serial.print("errorPose: ");
   //Serial.println(errorPose);
   if (errorPose <= errorPermitido) {
     finMovimiento = true;
+    controlIntegral = 0;
     return finMovimiento;
   }
-
   
-  velActualDerecha= calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
-  velActualIzquierda= -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
-  calculaDistanciaLinealRecorrida(); //Se actualizan las distancias recorridas por cada rueda en mm
-  float avanceRealizado = ((distLinealRuedaDerecha-distLinealRuedaDerechaAnterior)+(distLinealRuedaIzquierda-distLinealRuedaIzquierdaAnterior))/2;
-  float avanceRealizadoResta = ((distLinealRuedaDerecha-distLinealRuedaDerechaAnterior)-(distLinealRuedaIzquierda-distLinealRuedaIzquierdaAnterior));
-  //Serial.print("distLinealRuedaDerecha: ");
-  //Serial.println(distLinealRuedaDerecha);
-  //Serial.print("distLinealRuedaIzquierda: ");
-  //Serial.println(distLinealRuedaIzquierda);
-  //Serial.print("avanceRealizado: ");
-  //Serial.println(avanceRealizado);
-  orientacion = avanceRealizadoResta/(distanciaCentroARueda*2); //Calculo de orientacion (radianes) por odometria
-  orientacion = orientacion * (180 / PI); //Se convierte a grados
-  poseActualF[2] = poseActualF[2] + orientacion;
+  velActualDerecha = calculaVelocidadRueda(contPulsosDerecha, contPulsosDerPasado);
+  velActualIzquierda = -1.0 * calculaVelocidadRueda(contPulsosIzquierda, contPulsosIzqPasado); //como las ruedas están en espejo, la vel es negativa cuando avanza, por eso se invierte
 
-  
-  //Calcular nueva posición basado en el cambio de las ruedas
-  poseActualF[0] = poseActualF[0] + (avanceRealizado * cos(poseActualF[2]*(PI/ 180))); //coordenada X
-  poseActualF[1] = poseActualF[1] + (avanceRealizado * sin(poseActualF[2]*(PI/ 180))); //coordenada Y
-
-
-  //Serial.print("errorCoordenadaX: ");
-  //Serial.println(poseActualF[0]);
-  //Serial.print("errorCoordenadaY: ");
-  //Serial.println(poseActualF[1]);
-  //Serial.print("errorOrientacion: ");
-  //Serial.println(errorOrientacion);
-
+  // Control proporcional del carro
   float controlProporcional = KpPose * errorOrientacion;
-  float controlDerivativo = KdPose * (errorAnteriorOrientacion-errorOrientacion);
+  
+  // Contorl derivativo del carro
+  tiempoCoordenada = micros();
+  double dt = (tiempoCoordenada - tiempoPrevioCoordenada)/1000000.0;
+  float controlDerivativo = KdPose * (errorOrientacion - errorAnt_1_Orientacion)/dt;
 
-  float controlPose = controlProporcional + controlDerivativo;
+  // Control integral del carro
+  controlIntegral += KiPose * (errorOrientacion + 2*errorAnt_1_Orientacion + errorAnt_2_Orientacion)/2;
+  tiempoPrevioCoordenada = tiempoCoordenada;
 
-  float nuevaVelocidadRuedaDerecha = velBase + controlPose;
-  float nuevaVelocidadRuedaIzquierda = velBase - controlPose;
+  float controlPose = controlProporcional;// + controlDerivativo + controlIntegral; // Las constantes derivativas e integrales estan en cero
 
-  //Serial.print("VelocidadRuedaDerecha: ");
-  //Serial.println(nuevaVelocidadRuedaDerecha);
-  //Serial.print("VelocidadRuedaIzquierda: ");
-  //Serial.println(nuevaVelocidadRuedaIzquierda);
+  velocidadAngular = (velActualDerecha - velActualIzquierda)/(2*distanciaCentroARueda) + controlPose;
+
+  float nuevaVelocidadRuedaDerecha = velBase - velocidadAngular*(distanciaCentroARueda);
+  float nuevaVelocidadRuedaIzquierda = velBase + velocidadAngular*(distanciaCentroARueda);
+
+  serialPrint("e ");serialPrint(errorOrientacion);serialPrint(" VL ");serialPrint(nuevaVelocidadRuedaIzquierda);serialPrint(" VR ");serialPrintln(nuevaVelocidadRuedaDerecha);
 
   int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(nuevaVelocidadRuedaDerecha, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
   int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(nuevaVelocidadRuedaIzquierda, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
-
-  //Serial.print("VelocidadRuedaDerecha: ");
-  //Serial.println(velActualDerecha);
-  //Serial.print("VelocidadRuedaIzquierda: ");
-  //Serial.println(velActualIzquierda);
-   
+  
   ConfiguraEscribePuenteH (cicloTrabajoRuedaDerecha, cicloTrabajoRuedaIzquierda);
 
   distLinealRuedaDerechaAnterior = distLinealRuedaDerecha;
   distLinealRuedaIzquierdaAnterior = distLinealRuedaIzquierda;
-  errorAnteriorOrientacion = errorOrientacion;
-
-  poseActual[0] = round(poseActualF[0]);
-  poseActual[1] = round(poseActualF[1]);
-  poseActual[2] = round(poseActualF[2]);
+  errorAnt_2_Orientacion = errorAnt_1_Orientacion;
+  errorAnt_1_Orientacion = errorOrientacion;
   
   return finMovimiento;
 }
-
-
-
 
 //*****Funciones para manejar la orientación*********
 
@@ -1405,7 +1432,7 @@ void detectaCambio(float angulo){
 //Funcion que detecta los cuadrantes que recorre el magnetometro, básicamente detecta si se debe usar la diferencia entre
 //angulo inicial y final del magnetometro o si se usa su complemento, tiene como entrada el angulo del magnetometro
 
-      int cuadranteActual=buscaCuadrante(angulo); 
+      int cuadranteActual = buscaCuadrante(angulo); 
 
       //Segun el cambio entre cuadrante 1-2 o 2-1 se sabe si debe usar complemento o la diferencia normal de angulos
       if (cambio12 or cambio21){ 
@@ -1432,7 +1459,7 @@ void detectaCambio(float angulo){
       }
 
      //guarda el cuadrante anterior
-     cuadranteAnterior=cuadranteActual; 
+     cuadranteAnterior = cuadranteActual; 
 }
 
 float GiroReal(float angMPU, float angMagInicial, float angMagFinal) {
@@ -1558,11 +1585,11 @@ void guardarDatoFloat(float dato, int dirPagInicial) {
 //*****Funciones del magnetómetro*******
 
 void origenMagnet(){ //Mide la orientación y guarda un promedio
-  float x=0;
-  for(int i=0; i<25; i++){ //Medir orientacion con el magnetometro 25 veces y sacar un promedio
-    x = x + medirMagnet();
+  for(int i=0; i<100; i++){ //Medir orientacion con el magnetometro 25 veces para estabilizar el filtro
+    medirMagnet();
+    delay(5);
   }
-  magInicioOrigen = x/25;
+  magInicioOrigen = medirMagnet();
 }
 
 void inicializaMagnet() {
@@ -1612,7 +1639,7 @@ float medirMagnet() {
       z = segundoI2C.read(); //LSB z
       z |= segundoI2C.read() << 8; //MSB z
     }
-    //Se puede hacer un filtro de media entre los datos
+    //Se puede hacer un filtro paso bajo entre los datos
     xft = x * alfa + (1 - alfa) * xft;
     yft = y * alfa + (1 - alfa) * yft;
 
@@ -1641,7 +1668,122 @@ float medirMagnet() {
     angulo = angulo + 360;
   }
   
-  return angulo;
+  //serialPrint(angulo);serialPrint(' ');
+  return kalmanFilter(angulo);
+}
+
+/**** TRANSFORMACIÓN DE COORDENADAS ****/
+
+/// \brief Crea las matrices de transformación a ser utilizadas
+void transformation(){
+    serialPrintln(distCoordenadas);
+    CrearMensaje(distCoordenadas, 0, 0, 20, 0, 0);
+
+    int distanciasRecibidas[cantidadRobots]; // Arreglo para almacenar las distancias entre robots
+    distanciasRecibidas[idRobot-1]=distCoordenadas;
+    bool distanciaRobotRecibida[cantidadRobots]; // Arreglo para saber que distancia se ha recibido
+    bool todasDistanciasRecibidas = false;
+
+    for (int i = 0; i < cantidadRobots; i++)
+    {
+      if (i == (int)idRobot){
+        distanciaRobotRecibida[i] = true;
+      }else{
+        distanciaRobotRecibida[i] = false;
+      }
+    }
+    
+    while (!todasDistanciasRecibidas && cantPaquetesDistanciaEnviados == cantPaquetesDistanciaPorEnviar)
+    {
+      if (rf69_manager.available()){
+        if (rf69_manager.recvfrom(buf, &len, &from)){
+          buf[len] = 0;
+          distCoordenadas = *(int16_t*)&buf[0];
+
+          distanciasRecibidas[from - 1] = distCoordenadas;
+          distanciaRobotRecibida[from - 1] = true;
+        }
+        serialPrint(from);serialPrint(' ');serialPrintln(distCoordenadas);
+      }
+
+      for (int i = 0; i < cantidadRobots - 1; i++)
+      {
+        if (distanciaRobotRecibida[i] == true && distanciaRobotRecibida[i+1] == true){
+          todasDistanciasRecibidas = true;
+        }
+        else{
+          todasDistanciasRecibidas = false;
+        }
+      }
+    }
+
+    giroTerminado = false;
+    // Se toma el inicio en que se realiza el giro    
+    tiempoGiro=millis();
+
+    while (!giroTerminado){
+
+      ultimoAngMagnet= medirMagnet(); //medición de la orientación con el magnetómetro
+      detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
+      leeMPU(anguloMPU,velMPU); //medición del MPU
+
+      // Se especifica que debe girar -90 grados
+      giroTerminado=Giro(-85);
+
+      // Se espera un tiempo que realice el giro
+      if ((millis() - tiempoGiro) > limiteGiro){ //Si pasa mas del limite de tiempo tratando de girar se detiene y lo trata como si hubiera completado el giro, evita que se quede intentando girar si está bloqueado
+        giroTerminado = true;
+      }
+      
+      if(giroTerminado){
+        ConfiguracionParar();
+      }
+      delay(int(1.5*tiempoMuestreo/1000));
+    }
+    
+    // Crear el arreglo para la transformacion de coordenadas
+    for (int i = 0; i < cantidadRobots; i++) // Inicializacion del arreglo
+    {
+      matTransformation[i] = 0;
+    }
+    
+    // Configuracion del arreglo de transformacion
+    for (int i = 0; i < cantidadRobots; i++)
+    {
+      if (i+1 < idRobot)
+      {
+        for (int j = i; j < idRobot - 1; j++)
+        {
+          matTransformation[i] -= distanciasRecibidas[j];
+        }
+        if (i+1 > idRobot)
+        {
+          for (int j = idRobot-1; j < i; j++)
+          {
+            matTransformation[i] += distanciasRecibidas[j];
+          }
+        }
+      }
+    }
+
+    leerDistanciaSTM();
+}
+
+/// \brief Pide el valor de distancia al STM32
+/// \return La distancia inicial entre los robots 
+int leerDistanciaSTM(){
+    String acumulado = "";
+    Wire.requestFrom(dirSTM, cantBytesMsg);    // Pide cierta cantidad de datos al esclavo
+    int infDistanciaSTM;
+    while (0 < Wire.available()) { // ciclo mientras se reciben todos los datos
+        char c = Wire.read(); // se recibe un byte a la vez y se maneja como char
+        if (c == '.'){
+            infDistanciaSTM =  acumulado.toInt();
+        }else{
+            acumulado += c;
+        }
+    }
+    return infDistanciaSTM;
 }
 
 /**** RTC FUNCIONES****/
@@ -1666,7 +1808,6 @@ void sincronizacion() {
         RTC->MODE0.COMP[0].reg = masterClock + idRobot * tiempoRobotTDMA + 50;    //Partiendo del clock del master, calculo la próxima vez que tengo que hacer la interrupción según el ID. Sumo 50 ms para dejar un colchón que permita que todos los robots oigan el mensaje antes de empezar a hablar.
         while (RTCisSyncing());                                                   //Espero la sincronización.
 
-        serialPrintln("¡Reloj del máster clock recibido!");
         timeReceived = true;                                                      //Levanto la bandera que indica que recibí el reloj del máster y ya puedo pasar a transmitir.
         //Wire.onReceive(RecibirI2C);
       }
@@ -1735,10 +1876,74 @@ void RTC_Handler(void) {
     rf69_manager.sendto(mensaje, sizeof(mensaje), RH_BROADCAST_ADDRESS);        //Llamo a la función de enviar de la biblioteca Radio Head para enviar el mensaje del nodo.
     mensajeCreado = false;                      //Bajo la bandera para indicar que ya se envió el mensaje y se puede crear uno nuevo.
 
+    // Envia el paquete de distancia entre robots 5 veces
+    if (cantPaquetesDistanciaEnviados < cantPaquetesDistanciaPorEnviar)
+    {
+      mensajeCreado = true;
+      cantPaquetesDistanciaEnviados += 1;
+    }
+
     RTC->MODE0.INTFLAG.bit.CMP0 = true;         //Limpiar la bandera de la interrupción.
   }
 }
 
+// Funcion agregada para calcular la distancia que avanza 
+
+/// @brief Función para predecir el ángulo de giro del robot
+/// @param angulo Ángulo obtenido con ruido
+/// @return La predicción del ángulo del robot
+float kalmanFilter(float angulo){
+  static float anguloPredicho = 0; // Valor de retorno de la función
+
+  K = P*H/(H*P*H+R);//Ganacia de Kalman
+  anguloPredicho = anguloPredicho + K*(angulo-H*anguloPredicho);
+
+  P = (1-K*H)*P + Q;//Actualizar error covarianza
+
+  return anguloPredicho;
+}
+
+/// @brief Actualiza la ubicacion del robot cada iteracion tomando en cuenta el avance y la orientacion
+void actualizarUbicacion(){
+  
+  // Se obtiene la distancia que ha recorrido el robot
+  calculaDistanciaLinealRecorrida(); //Se actualizan las distancias recorridas por cada rueda en mm
+  
+  avanceRealizado = ((distLinealRuedaDerecha-distLinealRuedaDerechaAnterior)+(distLinealRuedaIzquierda-distLinealRuedaIzquierdaAnterior))/2;
+  distLinealRuedaDerechaAnterior = distLinealRuedaDerecha;
+  distLinealRuedaIzquierdaAnterior = distLinealRuedaIzquierda;
+  
+  float orientacionMagnetometro = ultimoAngMagnet - magInicioOrigen; // Quita el offset inicial del magnetometro
+  
+  if (orientacionMagnetometro < -180){
+    orientacionMagnetometro = orientacionMagnetometro + 360;
+  }else if (orientacionMagnetometro > 180)
+  {
+    orientacionMagnetometro = orientacionMagnetometro - 360;
+  }
+  
+  anguloOrientacion = alfa * (-tempOrientacionGiroscopio + anguloOrientacion) + (1 - alfa) * orientacionMagnetometro;
+
+  poseActual[2] = anguloOrientacion;
+  
+  if (estado != GIRO){
+    
+    // Seno debe ir con ángulo negativo porque la referencia de angulo de giro
+    poseActual[0] = poseActual[0] + (avanceRealizado * sin(anguloOrientacion*(PI/ 180))); //coordenada X
+    poseActual[1] = poseActual[1] + (avanceRealizado * cos(anguloOrientacion*(PI/ 180))); //coordenada Y
+
+  }
+  serialPrint("x ");serialPrint(poseActual[0]);serialPrint(" y ");serialPrint(poseActual[1]);serialPrint(" Ang ");serialPrintln(poseActual[2]);
+}
+
+/// @brief Reinicia variables del avance para evitar problemas
+void resetAvance(){
+  distLinealRuedaDerecha = 0;
+  distLinealRuedaDerechaAnterior = 0;
+
+  distLinealRuedaIzquierda = 0;
+  distLinealRuedaIzquierdaAnterior = 0;
+}
 
 void inicializarMPU() {
 //Inicializa la comunicación con el MPU
@@ -1796,10 +2001,13 @@ void leeMPU(float &gir_ang_z, float &vely) {
   gz = (float(gyro_z) - gz_off) / G_R;
 
   //Filtro, aun no se está usando, si se desear usar, cambiar 1 por 0.05
-  ayft = ay * 1 + (1 - 1) * ayft;
-  gzft = gz * 1 + (1 - 1) * gzft;
+  ayft = ay * alfa + (1 - alfa) * ayft;
+  gzft = gz * alfa + (1 - alfa) * gzft;
+
+  serialPrint(gzft);serialPrint(' ');
 
   gir_ang_z = gzft * (dt / 1000000.0) + gir_ang_zPrev;
+  tempOrientacionGiroscopio = gzft * (dt / 1000000.0);
   vely = ayft * (dt / 1000000.0);
 
   gir_ang_zPrev = gir_ang_z;
