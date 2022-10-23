@@ -212,6 +212,10 @@ int anguloGiro = 0;
 //Variables para el magnetómetro y su calibración
 const float declinacionMag = 0.0; //correccion del campo magnetico respecto al norte geográfico en Costa Rica
 const float alfa = 0.8; //constante para filtro de datos
+short x, y, z;  //Valores crudos del magnetometro
+float xof, yof, xrot, yrot, xf, yf; //Variables de funcion medirMagnet
+int cuentaMagnetError=0; //Cuenta de error del magnetometro
+bool magnetError=false; //Bandera de error de magnetometro
 float xft=0; //Valores filtrados
 float yft=0;
 float xoff = 0; //offset de calibración en x
@@ -226,7 +230,13 @@ float orientacion=0; //Usado en ActualizarUbicacion
 unsigned long tiempoPrev = 0;
 float gir_ang_zPrev, vel_y_Prev; //angulos previos para determinar el desplazamiento angular
 float gx_off, gy_off, gz_off, acx_off, acy_off, acz_off; // offsets para calibración del MPU6050
-float ayft, gzft;
+float ayft, azft, gzft;
+int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos del MPU
+float gz, ay; //guardan los valores reales de aceleración y velocidad angular
+long dt; //delta de tiempo para calcular desplazamiento angular
+int cuentaMPUerror = 0;  //Cuenta de error del MPU
+bool mpuError = false;  //Bandera de error del MPU
+float filtroMPU = 0.90;
 
 //Variables de calibración para magnetometro 
 const int numSamples=2000;
@@ -317,7 +327,7 @@ void setup() {
   attachInterrupt(ENC_IZQ_C2, PulsosRuedaIzquierdaC2_2,CHANGE);
   attachInterrupt(digitalPinToInterrupt(INT_OBSTACULO), DeteccionObstaculo,FALLING);
   
-  //temporización y varibales aleatorias
+  //temporización y variables aleatorias
   tiempoActual=millis(); //para temporización de los ciclos
   tiempoMaquinaEstados= micros();
   tiempoPollingPeri= micros();
@@ -439,6 +449,21 @@ void loop(){
     ultimoAngMagnet = medirMagnet(); //medición de la orientación con el magnetómetro
     detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
     leeMPU(anguloMPU,velMPU); //medición del MPU
+
+    //Pruebas de perifericos conectados a los buses I2C
+    if(magnetError){
+      ConfiguracionParar();
+      CrearObstaculo(40,0,0);
+      Serial.println("Magnet Error");
+      return;
+    }
+
+    if(mpuError){
+      ConfiguracionParar();
+      CrearObstaculo(41,0,0);
+      Serial.println("MPU Error");
+      return;
+    }
 
     actualizarUbicacion(); // Actualiza constantemente las coordenadas XY del robot
 
@@ -671,7 +696,7 @@ void RecorrerObstaculos(){
     }
     
     else{
-      if(minEnviado>0){
+      if(minEnviado>=0){
         minEnviado = minEnviado -1;
       }
     }
@@ -706,9 +731,8 @@ void ActualizarUbicacionReal() {
   }
 
   //Calcular nueva posición basado en la distancia y el angulo en que se movio (convertir coordenadas polares a rectangulares)
-  poseActual[0] = poseActual[0] + (distanciaAvanzada * cos(orientacion)); //coordenada X
-  poseActual[1] = poseActual[1] + (distanciaAvanzada * sin(orientacion)); //coordenada Y
-
+  poseActual[0] = (int)(poseActual[0] + (distanciaAvanzada * cos(orientacion))); //coordenada X
+  poseActual[1] = (int)(poseActual[1] + (distanciaAvanzada * sin(orientacion))); //coordenada Y
 }
 
 /// @brief Interrupción que realiza el STM32
@@ -1584,11 +1608,41 @@ void guardarDatoFloat(float dato, int dirPagInicial) {
 //*****Funciones del magnetómetro*******
 
 void origenMagnet(){ //Mide la orientación y guarda un promedio
-  for(int i=0; i<100; i++){ //Medir orientacion con el magnetometro 25 veces para estabilizar el filtro
+  for(int i=0; i<100; i++){ //Medir orientacion con el magnetometro 25 veces y sacar un promedio
     medirMagnet();
     delay(5);
   }
   magInicioOrigen = medirMagnet();
+}
+
+bool testMagnet(){ //Verifica que el magnetometro este midiendo datos y la comunicación es correcta
+  float y[10]={0};
+  int i=0;
+  float min=0, max=0;
+
+  for(i=0; i<10; i++){
+    y[i]=medirMagnet();
+    delay(5);
+  }
+
+  max=y[0];
+  min=y[0];
+
+  for(i=0; i<10; i++){
+    if(y[i]<min){
+      min=y[i];
+    }
+    else if(y[i]>max){
+      max=y[i];
+    }
+  }
+
+  if((max-min)>0.5){//Ver si la diferencia entre max y min es mayor a 0.5 para ver que si está recibiendo ruido y tomar eso como que el mag está midiendo correctamente
+    return true;
+  }
+  else{
+    return false;
+  }
 }
 
 void inicializaMagnet() {
@@ -1613,6 +1667,12 @@ void inicializaMagnet() {
   angElips = leerDatoFloat(8);
   factorEsc = leerDatoFloat(12);
 
+  //Prueba magnetometro
+  while(!testMagnet()){
+    Serial.println("Fallo prueba magnetometro");
+    delay(1000);
+  }
+
   //Obtiene el valor inicial de ángulo
   origenMagnet();
 }
@@ -1621,26 +1681,36 @@ float medirMagnet() {
   //Funcion que extrae los datos crudos del magnetometro, carga los valores de calibracion
   //adicionalmente usa un filtro para la toma de datos (media movil)
   //retorna el angulo en un rango de [0,360]
-  short x, y, z;
-  float xof, yof, xrot, yrot, xf, yf;
+
   //establece comunicación con el magnetómetro
-    
-    segundoI2C.beginTransmission(dirMag);
-    segundoI2C.write(0x00); //start with register 3.
-    segundoI2C.endTransmission();
-    //Pide 6 bytes del registro del magnetometro
-    segundoI2C.requestFrom(dirMag, 6);
-    if (6 <= segundoI2C.available()) {
-      x = segundoI2C.read(); //LSB  x
-      x |= segundoI2C.read() << 8; //MSB  x
-      y = segundoI2C.read(); //LSB  y
-      y |= segundoI2C.read() << 8; //MSB y
-      z = segundoI2C.read(); //LSB z
-      z |= segundoI2C.read() << 8; //MSB z
+  
+  segundoI2C.beginTransmission(dirMag);
+  segundoI2C.write(0x00); //start with register 3.
+  segundoI2C.endTransmission();
+  //Pide 6 bytes del registro del magnetometro
+  segundoI2C.requestFrom(dirMag, 6);
+  if (6 <= segundoI2C.available()) {
+    x = segundoI2C.read(); //LSB  x
+    x |= segundoI2C.read() << 8; //MSB  x
+    y = segundoI2C.read(); //LSB  y
+    y |= segundoI2C.read() << 8; //MSB y
+    z = segundoI2C.read(); //LSB z
+    z |= segundoI2C.read() << 8; //MSB z
+  }
+
+  //Prueba continua, verifica que existe ruido en los datos de la coordenada X, si el magnetometro falla el dato recibido va a ser constante
+  if (abs(x-xft)<0.1){
+    cuentaMagnetError++;
+    if(cuentaMagnetError>20){ //Si la prueba falla 20 veces se determina que el magnetometro fallo
+      magnetError=true;
+      //Serial.println("Magnet Error");
+      return 0.0;
     }
-    //Se puede hacer un filtro paso bajo entre los datos
-    xft = x * alfa + (1 - alfa) * xft;
-    yft = y * alfa + (1 - alfa) * yft;
+  }
+
+  //Se puede hacer un filtro de media entre los datos
+  xft = x * alfa + (1 - alfa) * xft;
+  yft = y * alfa + (1 - alfa) * yft;
 
   //***Corrección con los datos de calibración  
   //Sustrae los offset
@@ -1943,6 +2013,54 @@ void resetAvance(){
   distLinealRuedaIzquierda = 0;
   distLinealRuedaIzquierdaAnterior = 0;
 }
+bool testMPU() {
+//Funcion que extrae los datos crudos del MPU, los calibra y calcula desplazamiento angulares
+  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos
+  int i=0;
+  int16_t lista[10]={0};
+  int16_t max, min;
+  
+  for(i=0; i<10; i++){
+    segundoI2C.beginTransmission(0x68);   //empieza a comunicar con el mpu6050
+    segundoI2C.write(0x3B);   //envia byte 0x43 al sensor para indicar startregister
+    segundoI2C.endTransmission();   //termina comunicacion
+    segundoI2C.requestFrom(0x68, 14); //pide 6 bytes al sensor, empezando del reg 43 (ahi estan los valores del giro)
+
+    if (14 <= segundoI2C.available()) {
+      ac_x = segundoI2C.read() << 8 | segundoI2C.read();
+      ac_y = segundoI2C.read() << 8 | segundoI2C.read();
+      ac_z = segundoI2C.read() << 8 | segundoI2C.read();
+    
+      tmp = segundoI2C.read() << 8 | segundoI2C.read();
+    
+      gyro_x = segundoI2C.read() << 8 | segundoI2C.read(); //combina los valores del registro 44 y 43, desplaza lo del 43 al principio
+      gyro_y = segundoI2C.read() << 8 | segundoI2C.read();
+      gyro_z = segundoI2C.read() << 8 | segundoI2C.read();
+    }
+
+    lista[i]=ac_y;
+    delay(100);
+  }
+
+  max=lista[0];
+  min=lista[0];
+
+  for(i=0; i<10; i++){
+    if(lista[i]<min){
+      min=lista[i];
+    }
+    else if(lista[i]>max){
+      max=lista[i];
+    }
+  }
+
+  if((max-min)>1){//Ver si la diferencia entre max y min es mayor a 0.5 para ver que si está recibiendo ruido y tomar eso como que está midiendo correctamente
+    return true;
+  }
+  else{
+    return false;
+  }
+}
 
 void inicializarMPU() {
 //Inicializa la comunicación con el MPU
@@ -1958,6 +2076,12 @@ void inicializarMPU() {
   acx_off = leerDatoFloat(28);
   acy_off = leerDatoFloat(32);
   acz_off = leerDatoFloat(36);
+
+  //Prueba magnetometro
+  while(!testMPU()){
+    Serial.println("Fallo prueba MPU");
+    delay(1000);
+  }
 }
 
 void resetVarMPU(){
@@ -1968,9 +2092,6 @@ void resetVarMPU(){
 
 void leeMPU(float &gir_ang_z, float &vely) {
 //Funcion que extrae los datos crudos del MPU, los calibra y calcula desplazamiento angulares
-  int16_t gyro_x, gyro_y, gyro_z, tmp, ac_x, ac_y, ac_z; //guardan los datos crudos
-  float gz, ay; //guardan los valores reales de aceleración y velocidad angular
-  long dt; //delta de tiempo para calcular desplazamiento angular
   if (tiempoPrev == 0) {
     tiempoPrev = micros();
   }
@@ -1990,6 +2111,18 @@ void leeMPU(float &gir_ang_z, float &vely) {
     gyro_y = segundoI2C.read() << 8 | segundoI2C.read();
     gyro_z = segundoI2C.read() << 8 | segundoI2C.read();
   }
+
+  //Prueba continua, verifica que existe ruido en los datos, usa ac_z
+  if (abs(ac_z-azft)<0.1){
+    cuentaMPUerror++;
+    if(cuentaMPUerror>20){ //Si la prueba falla 20 veces se determina que el magnetometro fallo
+      mpuError=true;
+    }
+  }
+  else if(cuentaMPUerror>0){
+    cuentaMPUerror--;
+  }
+  azft=ac_z;
   
   unsigned long tiempoYaMicros= micros();
   dt =  tiempoYaMicros - tiempoPrev;
@@ -2000,10 +2133,8 @@ void leeMPU(float &gir_ang_z, float &vely) {
   gz = (float(gyro_z) - gz_off) / G_R;
 
   //Filtro, aun no se está usando, si se desear usar, cambiar 1 por 0.05
-  ayft = ay * alfa + (1 - alfa) * ayft;
-  gzft = gz * alfa + (1 - alfa) * gzft;
-
-  serialPrint(gzft);serialPrint(' ');
+  ayft = ay * filtroMPU + (1 - filtroMPU) * ayft;
+  gzft = gz * filtroMPU + (1 - filtroMPU) * gzft;
 
   gir_ang_z = gzft * (dt / 1000000.0) + gir_ang_zPrev;
   tempOrientacionGiroscopio = gzft * (dt / 1000000.0);
