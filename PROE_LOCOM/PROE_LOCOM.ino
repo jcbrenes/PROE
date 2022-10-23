@@ -222,7 +222,6 @@ float magInicioOrigen=0; //valor de orientación inicial
 float orientacion=0; //Usado en ActualizarUbicacion
 
 
-
 //Variables para el MPU6050 y su calibración
 unsigned long tiempoPrev = 0;
 float gir_ang_zPrev, vel_y_Prev; //angulos previos para determinar el desplazamiento angular
