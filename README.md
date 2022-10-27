@@ -40,4 +40,5 @@ Investigadores:
 Asistentes:
 - Bryan Alpízar Quesada bryan2300@gmail.com
 - Andrés Jiménez Mora andjm1428@gmail.com
+- Célimo Porras Aguilar celimojosepa@estudiantec.cr
 - David Gómez Carrasquilla davidjgomezc@gmail.com
