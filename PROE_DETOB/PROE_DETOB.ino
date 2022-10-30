@@ -21,7 +21,7 @@
 //https://github.com/rogerclarkmelbourne/Arduino_STM32/tree/master/STM32F1/libraries/WireSlave 
 
 /************ Serial Setup ***************/
-#define debug 0
+#define debug 1
 
 #if debug == 1
 #define serialPrint(x) Serial1.print(x)
@@ -57,7 +57,7 @@ const float beta=0.1;  //Constante para el filtro, ajustar para cambiar el compo
 const int servoDelay=5; //Tiempo entre cada paso del servo en milisegundos
 const float distanciaMinimaSharp=140; //Distancia mínima en milimetros para detección de obstáculos
 const int debounceTime=400; //Debounce para sensor IR frontal
-const float maxTemp=30; //Temperatura de detección de fuego
+const float maxTemp=40; //Temperatura de detección de fuego
 const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el servo que rota el sharp
 
 //Variables globales//
@@ -189,7 +189,7 @@ void revisarSharp(){ //Revisa el valor del sensor Sharp
   lectura=analogRead(sharp);
   filtrado=filtrado-(beta*(filtrado-lectura)); //Filtro de media movil
   distancia=1274160*pow(filtrado,-1.174); //Regresión lineal de datos experimentales para obtener distancia en milimetros
-  Serial1.println(int(distancia));
+  //Serial1.println(int(distancia));
   if ((distancia<distanciaMinimaSharp) && (angulo!=anguloAnterior)){ //revisa distancia umbral y que solo se haga un envío por cada ángulo
     crearMensaje(1,int(distancia),angulo); //Enviar obstaculo tipo 1 con distancia en cm y angulo
   }
@@ -199,8 +199,7 @@ void revisarSharp(){ //Revisa el valor del sensor Sharp
 void revisarTemperatura(){ //Lectura del sensor de temperatura
   float lectura = analogRead(temp);
   float temperatura = (0.08394*lectura)-54.162; //Formula extraida de la hoja de datos del sensor
-  //Serial1.println(lectura);
-  //Serial1.println(temperatura);
+  serialPrint(lectura);serialPrint(' ');serialPrintln(temperatura);
   if(temperatura>maxTemp){ //Valor máximo de temperatura aceptable
     int i = int(temperatura);
     crearMensaje(5,i,90); //Se pone angulo 90 para que no crea que es un obstáculo frontal

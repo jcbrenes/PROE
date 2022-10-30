@@ -21,7 +21,7 @@
 
 //Variables del enjambre para la comunicación a la base
 const uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
-unsigned long idRobot = 3; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
+unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 // Variables para el proceso de arranque y transformación de coordenadas
 int distCoordenadas; //Distancia inicial de los robot 
@@ -31,7 +31,7 @@ int cantPaquetesDistanciaEnviados = 0; //Variable para contar la cantidad de paq
 int cantPaquetesDistanciaPorEnviar = 5; // Cantidad de paquetes a enviar para la medición inicial.
 int posicionXAvanzarCoordenada = 0; // Posicion X a la que va a avanzar el robot en la funcion avanzarCoordenada
 int posicionYAvanzarCoordenada = 0; // Posicion Y a la qu va a avanzar el robot en la funcion avanzarCoordenada
-int errorAvanzarCoordenada = 30; // Error que se permita de la posicion XY de la funcion avanzarCoordenada
+int errorAvanzarCoordenada = 30; // Error que se permita de la posicion XY de la funcion avanzarCoordenada, debe ser minimo el ancho de los Atta
 
 // Variables recibidas por los otros Atta-Bots
 int16_t posXRecibido;
@@ -283,7 +283,7 @@ const uint8_t timeOffset = 2; //Offset que existe entre el máster enviando y el
 
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 uint8_t len = sizeof(buf);
-uint8_t from;
+uint8_t idMensajeRecibido;
 uint16_t* ptrMensaje; //Puntero para descomponer datos en bytes.
 uint8_t mensaje[5 * sizeof(uint16_t) + sizeof(uint8_t)]; // Mensaje a enviar a la base
 
@@ -404,7 +404,12 @@ void setup() {
 
   //******En caso de usar el robot solo (no como enjambre), comentar las dos siguiente lineas
   sincronizacion(); //Esperar mensaje de sincronizacion de la base antes de moverse
-  transformation(); // Proceso de transformación de coordenadas
+  // Crear el arreglo para la transformacion de coordenadas
+  for (int i = 0; i < cantidadRobots; i++) // Inicializacion del arreglo
+  {
+    matTransformation[i] = 0;
+  }
+  transformation(); // Proceso de transformación de coordenadas, comentar en caso de no requerirse
 
   //descomentar la siguiente linea si se quiere llevar el robot a cierta coordenada
   //estado = CONTROL_POSE;
@@ -415,7 +420,7 @@ void loop(){
   RecorrerObstaculos();
 
   if (rf69_manager.available() && estado != CONTROL_POSE){ // Cuando los robot se agrupan evita que reciba mensajes
-    if (rf69_manager.recvfrom(buf, &len, &from)){
+    if (rf69_manager.recvfrom(buf, &len, &idMensajeRecibido)){
       buf[len] = 0;
       posXRecibido = *(int16_t*)&buf[0];
       posYRecibido = *(int16_t*)&buf[2];
@@ -423,13 +428,13 @@ void loop(){
       tipSensRecibido = (int8_t)buf[6];
       disRecibido = *(int16_t*)&buf[7];
       anguloRecibido = *(int16_t*)&buf[9];
-      serialPrint(from);serialPrint("; ");serialPrint(posXRecibido);serialPrint("; ");serialPrint(posYRecibido);
+      serialPrint(idMensajeRecibido);serialPrint("; ");serialPrint(posXRecibido);serialPrint("; ");serialPrint(posYRecibido);
       serialPrint("; ");serialPrint(rotRecibido);serialPrint("; ");serialPrint(tipSensRecibido);
       serialPrint("; ");serialPrint(disRecibido);serialPrint("; ");serialPrintln(anguloRecibido);
     }
     if(tipSensRecibido == 5){ // Activa que los robot se agrupen, en caso de no ocuparse comentar
       posicionXAvanzarCoordenada = posXRecibido;
-      posicionYAvanzarCoordenada = posYRecibido + matTransformation[from];
+      posicionYAvanzarCoordenada = posYRecibido + matTransformation[idMensajeRecibido];
       estado = CONTROL_POSE;
     }
   }
@@ -447,6 +452,7 @@ void loop(){
     //Polling de perifericos conectados a los buses I2C
     leerMsgSTM(); //lectura de obstáculo en el STM
     ultimoAngMagnet = medirMagnet(); //medición de la orientación con el magnetómetro
+    serialPrintln(ultimoAngMagnet);
     detectaCambio(ultimoAngMagnet); //detectar cambio de orientación para corrección en valores
     leeMPU(anguloMPU,velMPU); //medición del MPU
 
@@ -742,7 +748,7 @@ void DeteccionObstaculo(){
   // Primero verifica que no esté en el proceso de arranque
   if (!datoCoordenadas){ // Recibe la distancia del sharp que hay entre el robot y el frente 
     distCoordenadas = leerDistanciaSTM();
-    serialPrintln(distCoordenadas);
+    //serialPrintln(distCoordenadas);
     datoCoordenadas = true;
   }else{// Modo normal de operación
     //Son obstáculos que requieren que el robot retroceda y cambie de dirección inmediatamente
@@ -1376,6 +1382,7 @@ bool AvanzarCoordenada(int coordenadaXDeseada, int coordenadaYDeseada, float err
   //Serial.println(errorPose);
   if (errorPose <= errorPermitido) {
     finMovimiento = true;
+    banderaParar = true;
     controlIntegral = 0;
     return finMovimiento;
   }
@@ -1402,7 +1409,7 @@ bool AvanzarCoordenada(int coordenadaXDeseada, int coordenadaYDeseada, float err
   float nuevaVelocidadRuedaDerecha = velBase - velocidadAngular*(distanciaCentroARueda);
   float nuevaVelocidadRuedaIzquierda = velBase + velocidadAngular*(distanciaCentroARueda);
 
-  serialPrint("e ");serialPrint(errorOrientacion);serialPrint(" VL ");serialPrint(nuevaVelocidadRuedaIzquierda);serialPrint(" VR ");serialPrintln(nuevaVelocidadRuedaDerecha);
+  //serialPrint("e ");serialPrint(errorOrientacion);serialPrint(" VL ");serialPrint(nuevaVelocidadRuedaIzquierda);serialPrint(" VR ");serialPrintln(nuevaVelocidadRuedaDerecha);
 
   int cicloTrabajoRuedaDerecha = ControlVelocidadRueda(nuevaVelocidadRuedaDerecha, velActualDerecha, sumErrorVelDer, errorAnteriorVelDer);
   int cicloTrabajoRuedaIzquierda = ControlVelocidadRueda(nuevaVelocidadRuedaIzquierda, velActualIzquierda, sumErrorVelIzq, errorAnteriorVelIzq);
@@ -1706,6 +1713,8 @@ float medirMagnet() {
       //Serial.println("Magnet Error");
       return 0.0;
     }
+  }else if (cuentaMagnetError > 1){
+    cuentaMagnetError--;
   }
 
   //Se puede hacer un filtro de media entre los datos
@@ -1737,7 +1746,7 @@ float medirMagnet() {
     angulo = angulo + 360;
   }
   
-  //serialPrint(angulo);serialPrint(' ');
+  serialPrint(angulo);serialPrint(' ');
   return kalmanFilter(angulo);
 }
 
@@ -1745,7 +1754,7 @@ float medirMagnet() {
 
 /// \brief Crea las matrices de transformación a ser utilizadas
 void transformation(){
-    serialPrintln(distCoordenadas);
+    //serialPrintln(distCoordenadas);
     CrearMensaje(distCoordenadas, 0, 0, 20, 0, 0);
 
     int distanciasRecibidas[cantidadRobots]; // Arreglo para almacenar las distancias entre robots
@@ -1765,14 +1774,14 @@ void transformation(){
     while (!todasDistanciasRecibidas && cantPaquetesDistanciaEnviados == cantPaquetesDistanciaPorEnviar)
     {
       if (rf69_manager.available()){
-        if (rf69_manager.recvfrom(buf, &len, &from)){
+        if (rf69_manager.recvfrom(buf, &len, &idMensajeRecibido)){
           buf[len] = 0;
           distCoordenadas = *(int16_t*)&buf[0];
 
-          distanciasRecibidas[from - 1] = distCoordenadas;
-          distanciaRobotRecibida[from - 1] = true;
+          distanciasRecibidas[idMensajeRecibido - 1] = distCoordenadas;
+          distanciaRobotRecibida[idMensajeRecibido - 1] = true;
         }
-        serialPrint(from);serialPrint(' ');serialPrintln(distCoordenadas);
+        //serialPrint(idMensajeRecibido);serialPrint(' ');serialPrintln(distCoordenadas);
       }
 
       for (int i = 0; i < cantidadRobots - 1; i++)
@@ -1808,12 +1817,6 @@ void transformation(){
         ConfiguracionParar();
       }
       delay(int(1.5*tiempoMuestreo/1000));
-    }
-    
-    // Crear el arreglo para la transformacion de coordenadas
-    for (int i = 0; i < cantidadRobots; i++) // Inicializacion del arreglo
-    {
-      matTransformation[i] = 0;
     }
     
     // Configuracion del arreglo de transformacion
@@ -2002,7 +2005,7 @@ void actualizarUbicacion(){
     poseActual[1] = poseActual[1] + (avanceRealizado * cos(anguloOrientacion*(PI/ 180))); //coordenada Y
 
   }
-  serialPrint("x ");serialPrint(poseActual[0]);serialPrint(" y ");serialPrint(poseActual[1]);serialPrint(" Ang ");serialPrintln(poseActual[2]);
+  //serialPrint("x ");serialPrint(poseActual[0]);serialPrint(" y ");serialPrint(poseActual[1]);serialPrint(" Ang ");serialPrintln(poseActual[2]);
 }
 
 /// @brief Reinicia variables del avance para evitar problemas

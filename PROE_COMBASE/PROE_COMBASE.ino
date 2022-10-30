@@ -40,7 +40,7 @@ RHDatagram rf69_manager(rf69, MY_ADDRESS);
 unsigned long timeStamp1;
 uint8_t buf[RH_RF69_MAX_MESSAGE_LEN];
 uint8_t len = sizeof(buf);
-uint8_t from;
+uint8_t idMensajeRecibido;
 
 // Variables de recepción de datos
 int16_t posX;
@@ -91,23 +91,29 @@ void setup()
 
   sincronizar(); // Envía el valor de clock a los robots del enjambre
 
-  transformation(); // Recibe la información de la transoformación de coordenadas
+  // Crear el arreglo para la transformacion de coordenadas
+  for (int i = 0; i < cantidadRobots; i++) // Inicializacion del arreglo
+  {
+    matTransformation[i] = 0;
+  }
+
+  transformation(); // Recibe la información de la transoformación de coordenadas, comentar en caso de no requerirse
 }
 
 void loop() {
   // Código
   if (rf69_manager.available()){
-    if (rf69_manager.recvfrom(buf, &len, &from)){
+    if (rf69_manager.recvfrom(buf, &len, &idMensajeRecibido)){
       buf[len] = 0;
       posX = *(int16_t*)&buf[0];
-      posY = *(int16_t*)&buf[2];
+      posY = *(int16_t*)&buf[2] + matTransformation[idMensajeRecibido];;
       rot = *(int16_t*)&buf[4];
       tipSens = (int8_t)buf[6];
       dis = *(int16_t*)&buf[7];
       angulo = *(int16_t*)&buf[9];
     }
     if(tipSens != 20){ // Cuando recibe una distancia el tipo de sensor es 20
-      serialPrint(from);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
+      serialPrint(idMensajeRecibido);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
       serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
       serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrintln(angulo);
     }
@@ -145,13 +151,13 @@ void transformation(){
   while (!todasDistanciasRecibidas)
   {
     if (rf69_manager.available()){ // Recepcion de datos
-      if (rf69_manager.recvfrom(buf, &len, &from)){
+      if (rf69_manager.recvfrom(buf, &len, &idMensajeRecibido)){
         buf[len] = 0;
         distCoordenadas = *(int16_t*)&buf[0];
         tipSens = (int8_t)buf[6];
         if(tipSens == 20){
-          distanciasRecibidas[from - 1] = distCoordenadas;
-          distanciaRobotRecibida[from - 1] = true;
+          distanciasRecibidas[idMensajeRecibido - 1] = distCoordenadas;
+          distanciaRobotRecibida[idMensajeRecibido - 1] = true;
         }
       }
     }
@@ -166,12 +172,6 @@ void transformation(){
         todasDistanciasRecibidas = false;
       }
     }
-  }
-
-  // Crear el arreglo para la transformacion de coordenadas
-  for (int i = 0; i < cantidadRobots; i++) // Inicializacion del arreglo
-  {
-    matTransformation[i] = 0;
   }
   
   // Configuracion del arreglo de transformacion
