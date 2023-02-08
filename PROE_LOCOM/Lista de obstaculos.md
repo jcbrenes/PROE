@@ -20,6 +20,7 @@ Lista de tipos de mensajes que se van a recibir en la base:
 - 4: IR izquierdo
 - 5: Temperatura
 - 6: Batería baja 
+- 15: El Atta completó la función avanzarCoordenada y deja de avanzar
 - 20: Medición de distancia inicial para coordinación de coordenadas
 - 40: Falla de magnetómetro
 - 41: Falla de MPU
