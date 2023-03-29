@@ -41,4 +41,5 @@ Asistentes:
 - Bryan Alpízar Quesada bryan2300@gmail.com
 - Andrés Jiménez Mora andjm1428@gmail.com
 - Célimo Porras Aguilar celimojosepa@estudiantec.cr
+- Isaac Méndez Barquero isaacmn24@estudiantec.cr
 - David Gómez Carrasquilla davidjgomezc@gmail.com
