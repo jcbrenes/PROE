@@ -20,7 +20,7 @@
 #endif
 
 //Variables del enjambre para la comunicación a la base
-const uint8_t cantidadRobots = 4; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
+const uint8_t cantidadRobots = 3; //Cantidad de robots en enjambre. No cuenta la base, solo los que hablan.
 unsigned long idRobot = 2; //ID del robot, este se usa para ubicar al robot dentro de todo el ciclo de TDMA.
 
 // Variables para el proceso de arranque y transformación de coordenadas
