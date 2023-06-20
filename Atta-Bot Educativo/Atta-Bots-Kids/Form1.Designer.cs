@@ -55,6 +55,7 @@
             this.Atras = new System.Windows.Forms.Button();
             this.Avanzar = new System.Windows.Forms.Button();
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
+            this.desarrolladoresToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.Herramientas.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.Historial.SuspendLayout();
@@ -117,7 +118,8 @@
             // 
             this.acercaDeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.versionToolStripMenuItem,
-            this.ayudaToolStripMenuItem});
+            this.ayudaToolStripMenuItem,
+            this.desarrolladoresToolStripMenuItem});
             this.acercaDeToolStripMenuItem.Name = "acercaDeToolStripMenuItem";
             this.acercaDeToolStripMenuItem.Size = new System.Drawing.Size(89, 24);
             this.acercaDeToolStripMenuItem.Text = "Acerca de";
@@ -125,14 +127,14 @@
             // versionToolStripMenuItem
             // 
             this.versionToolStripMenuItem.Name = "versionToolStripMenuItem";
-            this.versionToolStripMenuItem.Size = new System.Drawing.Size(140, 26);
+            this.versionToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.versionToolStripMenuItem.Text = "Versión";
             this.versionToolStripMenuItem.Click += new System.EventHandler(this.versionToolStripMenuItem_Click);
             // 
             // ayudaToolStripMenuItem
             // 
             this.ayudaToolStripMenuItem.Name = "ayudaToolStripMenuItem";
-            this.ayudaToolStripMenuItem.Size = new System.Drawing.Size(140, 26);
+            this.ayudaToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.ayudaToolStripMenuItem.Text = "Ayuda";
             this.ayudaToolStripMenuItem.Click += new System.EventHandler(this.ayudaToolStripMenuItem_Click);
             // 
@@ -330,6 +332,13 @@
             this.Avanzar.UseVisualStyleBackColor = true;
             this.Avanzar.Click += new System.EventHandler(this.Avanzar_Click);
             // 
+            // desarrolladoresToolStripMenuItem
+            // 
+            this.desarrolladoresToolStripMenuItem.Name = "desarrolladoresToolStripMenuItem";
+            this.desarrolladoresToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.desarrolladoresToolStripMenuItem.Text = "Desarrolladores";
+            this.desarrolladoresToolStripMenuItem.Click += new System.EventHandler(this.desarrolladoresToolStripMenuItem_Click);
+            // 
             // Main
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
@@ -342,7 +351,7 @@
             this.MainMenuStrip = this.menuStrip1;
             this.Name = "Main";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "Atta-Bots Kids";
+            this.Text = "Atta-Bot Educativo";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Main_FormClosing);
             this.Herramientas.ResumeLayout(false);
             this.Herramientas.PerformLayout();
@@ -385,6 +394,7 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Button Limpiar;
         private System.Windows.Forms.SaveFileDialog saveFileDialog1;
+        private System.Windows.Forms.ToolStripMenuItem desarrolladoresToolStripMenuItem;
     }
 }
 
