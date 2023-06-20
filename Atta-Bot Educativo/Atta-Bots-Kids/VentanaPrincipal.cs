@@ -320,7 +320,7 @@ namespace Atta_Bots_Kids
 
         private void desarrolladoresToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            if (InputBoxInformación("Versión", Globals.desarrolladores[0]) == DialogResult.OK)
+            if (InputBoxInformación("Desarrolladores", Globals.desarrolladores[0]) == DialogResult.OK)
             {
 
             }

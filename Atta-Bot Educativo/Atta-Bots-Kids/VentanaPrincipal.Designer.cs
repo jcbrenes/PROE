@@ -39,6 +39,7 @@
             this.acercaDeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.versionToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.ayudaToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.desarrolladoresToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.Historial = new System.Windows.Forms.Panel();
             this.DisplayHistorial = new System.Windows.Forms.Panel();
             this.Limpiar = new System.Windows.Forms.Button();
@@ -55,7 +56,6 @@
             this.Atras = new System.Windows.Forms.Button();
             this.Avanzar = new System.Windows.Forms.Button();
             this.saveFileDialog1 = new System.Windows.Forms.SaveFileDialog();
-            this.desarrolladoresToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.Herramientas.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.Historial.SuspendLayout();
@@ -137,6 +137,13 @@
             this.ayudaToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
             this.ayudaToolStripMenuItem.Text = "Ayuda";
             this.ayudaToolStripMenuItem.Click += new System.EventHandler(this.ayudaToolStripMenuItem_Click);
+            // 
+            // desarrolladoresToolStripMenuItem
+            // 
+            this.desarrolladoresToolStripMenuItem.Name = "desarrolladoresToolStripMenuItem";
+            this.desarrolladoresToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
+            this.desarrolladoresToolStripMenuItem.Text = "Desarrolladores";
+            this.desarrolladoresToolStripMenuItem.Click += new System.EventHandler(this.desarrolladoresToolStripMenuItem_Click);
             // 
             // Historial
             // 
@@ -331,13 +338,6 @@
             this.Avanzar.TabIndex = 0;
             this.Avanzar.UseVisualStyleBackColor = true;
             this.Avanzar.Click += new System.EventHandler(this.Avanzar_Click);
-            // 
-            // desarrolladoresToolStripMenuItem
-            // 
-            this.desarrolladoresToolStripMenuItem.Name = "desarrolladoresToolStripMenuItem";
-            this.desarrolladoresToolStripMenuItem.Size = new System.Drawing.Size(224, 26);
-            this.desarrolladoresToolStripMenuItem.Text = "Desarrolladores";
-            this.desarrolladoresToolStripMenuItem.Click += new System.EventHandler(this.desarrolladoresToolStripMenuItem_Click);
             // 
             // Main
             // 
