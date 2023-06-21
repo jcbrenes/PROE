@@ -19,6 +19,7 @@ public static class Globals
         Play
     }
     public static string[] codigos = { "del", "atr", "izq", "der", "obs", "rep","stp","ply" };
+    public static string[] desarrolladores = { "Isaac David Ortega Arguedas" };
     public static int tamanioInstrucciones = 60;
     private static int posicionInstrucciones = 5;
     public static int PosicionInstrucciones

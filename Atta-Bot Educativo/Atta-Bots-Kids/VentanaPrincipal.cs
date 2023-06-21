@@ -24,10 +24,8 @@ namespace Atta_Bots_Kids
         private Contenedor ciclo;
         public Main()
         {
-            //pruebaPuerto();
             Syncfusion.Licensing.SyncfusionLicenseProvider.RegisterLicense("MTc5NDk3M0AzMjMxMmUzMTJlMzMzNUZLTGw0RG5rRDVYUGVTMHJSamlIaEM2MWpHWWxEdkJKMEtMd21LSi9ybzQ9"); // llave de acceso de Syncfusion
             InitializeComponent();
-            //autodetectarPuertoCOM();
             cicloActivo = false;
             detectarObstaculo = false;
             instrucciones = new List<Contenedor>();
@@ -319,6 +317,14 @@ namespace Atta_Bots_Kids
                 
             }
         }
+
+        private void desarrolladoresToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (InputBoxInformación("Desarrolladores", Globals.desarrolladores[0]) == DialogResult.OK)
+            {
+
+            }
+        }
         /// <summary>
         /// Redirige al usuario al manual de usuario, el cual se encuentra en una paina web
         /// </summary>
@@ -463,30 +469,7 @@ namespace Atta_Bots_Kids
                     //instrucciones[i].actualizarPosicion(Globals.PosicionInstrucciones, ejeY);
                 }
             }
-            /*instrucciones.RemoveAt(Globals.posicionCiclo);
-            int ejeY;
-            for (int i = Globals.posicionCiclo; i < instrucciones.Count; i++)
-            {
-                ejeY = Globals.tamanioInstrucciones * i + Globals.espacioEntreInstrucciones * i;
-                instrucciones[i].actualizarPosicion(Globals.PosicionInstrucciones, ejeY);
-            }
-            Globals.posicionCiclo = -1;*/
-            /*if(instrucciones.Last() == ciclo)
-            {
-                instrucciones.Remove(ciclo);
-            }
-            else
-            {
-                int posCiclo = instrucciones.IndexOf(ciclo);
-                instrucciones.Remove(ciclo);
-                ciclo = null;
-                int ejeY;
-                for (int i = posCiclo; i < instrucciones.Count; i++)
-                {
-                    ejeY = Globals.tamanioInstrucciones * i + Globals.espacioEntreInstrucciones * i;
-                    instrucciones[i].actualizarPosicion(Globals.PosicionInstrucciones, ejeY);
-                }
-            }*/
+            
         }
         /// <summary>
         /// llama un dialog box que indica que se alcanzó el limite de instrucciones
@@ -507,7 +490,6 @@ namespace Atta_Bots_Kids
                 serialPort1.Close();
                 serialPort1.Dispose();
                 bool portfound = false;
-                //serialPort1.PortName = s;
                 serialPort1 = new SerialPort(s,Globals.velocidadPuerto);
                 serialPort1.Parity = Parity.None;
                 Console.WriteLine(s);
@@ -581,7 +563,6 @@ namespace Atta_Bots_Kids
             {
                 serialPort1.Close();
             }
-            //serialPort1.Handshake = Handshake.RequestToSend;
             serialPort1.ReadTimeout = 1000;
             serialPort1.RtsEnable = true;
             serialPort1.Open();
@@ -705,6 +686,5 @@ namespace Atta_Bots_Kids
 
             return dialogResult;
         }
-
     }
 }

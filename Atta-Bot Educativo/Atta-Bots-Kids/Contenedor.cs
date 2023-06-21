@@ -135,47 +135,6 @@ namespace Atta_Bots_Kids
                         instruccion++;
                     }
                 }
-                /*int ejeY;
-                int ejeX = PosicionInstrucciones;
-                int contador = instrucciones.Count - 1;
-                int instruccion = CantInstrucciones - 1;
-                while (instrucciones[contador] != this) 
-                {
-                    ejeY = tamanioInstrucciones * instruccion + espacioEntreInstrucciones * instruccion;
-                    if (instrucciones[contador].actualizarPosicion(ejeX,ejeY))
-                    {
-                        instruccion--;
-                    }
-                    else
-                    {
-                        ejeY = 5;
-                    }
-                    contador--;
-                }
-                instrucciones.Remove(this);*/
-                /*for (int i = instrucciones.Count - 1; i > pos; i--)
-                {
-                    if()
-                    /*if (i != posicionCiclo)
-                    {
-                        ejeY = tamanioInstrucciones * i + espacioEntreInstrucciones * i;
-                        instrucciones[i].actualizarPosicion(boton.Left, ejeY);
-                    };
-                    if (i != posicionCiclo)
-                    {
-                        ejeY = tamanioInstrucciones * i + espacioEntreInstrucciones * i;
-                        instrucciones[i].actualizarPosicion(PosicionInstrucciones, ejeY);
-                    };
-                    /*if(i <= posicionCiclo && posicionCiclo != -1)
-                    {
-                        ejeY = tamanioInstrucciones * i + espacioEntreInstrucciones * i;
-                        instrucciones[i].actualizarPosicion(5, ejeY);
-                    }else if(i >= posicionCiclo && i <= posicionCiclo)
-                    {
-                        ejeY = tamanioInstrucciones * i + espacioEntreInstrucciones * i;
-                        instrucciones[i].actualizarPosicion(55, ejeY);
-                    }
-                }*/
                 Console.WriteLine("borrado");
             }
             eliminarInstruccion();
