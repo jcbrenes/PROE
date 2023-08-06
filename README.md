@@ -43,3 +43,4 @@ Asistentes:
 - Célimo Porras Aguilar celimojosepa@estudiantec.cr
 - Isaac Méndez Barquero isaacmn24@estudiantec.cr
 - David Gómez Carrasquilla davidjgomezc@gmail.com
+- Sharon Vásquez Díaz sharon.vasquez20@estudiantec.cr
