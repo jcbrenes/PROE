@@ -78,7 +78,7 @@ unsigned long millisLED=0;
 int c=0; //Pulso de led para ver actividad del STM
 unsigned long lastSend=0; //Almacena cuando se envio el ultimo obstaculo para evitar saturar la comunicación
 const int sendDelay=100; //Tiempo minimo en ms entre cada envio de obstaculo (evita crash del stm)
-char dato[50];
+char dato[10];
 bool nuevoObstaculo = false;
 unsigned long tiempoObstaculo=0; //Guarda en que momento se detecto el ultimo obstaculo
 const int maxTiempoObstaculo=200; //Si no se atiende un obstaculo en 200ms se ignora
