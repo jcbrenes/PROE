@@ -195,7 +195,6 @@ bool resetObstaculos=false; //Bandera que permite reiniciar los obstaculos detec
 //Variables para el algoritmo de exploración
 int distanciaAvanzada = 0;
 float poseActual[3] = {0, 0, 0}; //Almacena la pose actual: ubicación en x, ubicación en y, orientación.
-float poseInterrupcion[3] = {0, 0, 0}; //Almacena la pose que se tenía en la interrupción
 float anguloOrientacion = 0; // Variable que guarda la orientacion actual del robot en cada momento
 float tempOrientacionGiroscopio = 0; // Variable para obtener la orientacion del giroscopio
 float avanceRealizado = 0; // Avance que el robot realiza en cada intervalo de tiempo
@@ -625,15 +624,9 @@ void CrearObstaculo(int tipoSensor, int distancia, int angulo){
   }
   //Guarda la pose actual donde se detectó el obstáculo y el tipo y detalles del obstáculo
   
-  //Se guarda la info del obstáculo con la posición que se tiene en este momento
   datosSensores[ultimoObstaculo][0] = int(poseActual[0]); //Pose X
   datosSensores[ultimoObstaculo][1] = int(poseActual[1]); //Pose Y
   datosSensores[ultimoObstaculo][2] = int(poseActual[2]); //Orientacion respecto al inicio
-
-  //Se guarda la información del obstáculo con la información que se guardó en la interrupción
-  //datosSensores[ultimoObstaculo][0] = int(poseInterrupcion[0]); //Pose X
-  //datosSensores[ultimoObstaculo][1] = int(poseInterrupcion[1]); //Pose Y
-  //datosSensores[ultimoObstaculo][2] = int(poseInterrupcion[2]); //Orientacion respecto al inicio
 
   datosSensores[ultimoObstaculo][3] = tipoSensor;
   datosSensores[ultimoObstaculo][4] = distancia;
@@ -765,9 +758,6 @@ void DeteccionObstaculo(){
       estado=RETROCEDA;
       ConfiguracionParar(); //Se detiene un momento y reset de encoders 
       tiempoRetroceso= tiempoActual; //Almacena el ultimo tiempo para usarlo en el temporizador
-      poseInterrupcion[0]=poseActual[0];
-      poseInterrupcion[1]=poseActual[1];
-      poseInterrupcion[2]=poseActual[2];
     }
   }
 }

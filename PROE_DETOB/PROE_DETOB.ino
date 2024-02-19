@@ -302,7 +302,6 @@ void crearMensaje(int caso, int distancia, int angulo){ //Prepara el paquete de 
 void responderFeather(){ 
   if (nuevoObstaculo){ //Evita enviar el mismo obstaculo dos veces
     Wire.write(dato);  //Envia el valor al master
-    memset(dato,0,10); //Resetea el valor almacenado en dato, para evitar que se envie mas
     nuevoObstaculo = false;
     // El feather debe avisar que terminó el proceso de arranque, luego la operación es normal
     if (inicioFeatherListo == 2 && distInicialListo == false){
