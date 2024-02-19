@@ -17,7 +17,7 @@
 #endif
 
 // Variables para la transformación de coordenadas
-const int cantidadRobots = 3;
+const int cantidadRobots = 2;
 int transformacionRespectoA = 1; // La transformacion de coordeanadas se va a hacer respecto a este robot
 int distCoordenadas; // Recibe la informacion de distanci de cada robot
 int matTransformation[cantidadRobots]; // Arreglo utilizado para transformar las coordenadas de los robots.
@@ -111,11 +111,6 @@ void loop() {
       tipSens = (int8_t)buf[6];
       dis = *(int16_t*)&buf[7];
       angulo = *(int16_t*)&buf[9];
-    }
-    if(tipSens != 20){ // Cuando recibe una distancia el tipo de sensor es 20
-      serialPrint(idMensajeRecibido);serialPrint("; ");serialPrint(posX);serialPrint("; ");serialPrint(posY);
-      serialPrint("; ");serialPrint(rot);serialPrint("; ");serialPrint(tipSens);
-      serialPrint("; ");serialPrint(dis);serialPrint("; ");serialPrintln(angulo);
     }
   }
   
