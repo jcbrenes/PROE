@@ -64,7 +64,7 @@ const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el ser
 int angulo=0;
 int anguloAnterior=0;
 int lectura=0;
-float distancia=0; // Distancia medida por el sharp
+float distancia=5000; // Distancia medida por el sharp, valor inicial grande
 float filtrado=0;
 int cuentaBateria=0;
 int sensorIRdetectado=0;
@@ -78,7 +78,7 @@ unsigned long millisLED=0;
 int c=0; //Pulso de led para ver actividad del STM
 unsigned long lastSend=0; //Almacena cuando se envio el ultimo obstaculo para evitar saturar la comunicación
 const int sendDelay=100; //Tiempo minimo en ms entre cada envio de obstaculo (evita crash del stm)
-char dato[50];
+char dato[10];
 bool nuevoObstaculo = false;
 unsigned long tiempoObstaculo=0; //Guarda en que momento se detecto el ultimo obstaculo
 const int maxTiempoObstaculo=200; //Si no se atiende un obstaculo en 200ms se ignora
@@ -302,6 +302,7 @@ void crearMensaje(int caso, int distancia, int angulo){ //Prepara el paquete de 
 void responderFeather(){ 
   if (nuevoObstaculo){ //Evita enviar el mismo obstaculo dos veces
     Wire.write(dato);  //Envia el valor al master
+    memset(dato,0,10); //Resetea el valor almacenado en dato, para evitar que se envie mas
     nuevoObstaculo = false;
     // El feather debe avisar que terminó el proceso de arranque, luego la operación es normal
     if (inicioFeatherListo == 2 && distInicialListo == false){
