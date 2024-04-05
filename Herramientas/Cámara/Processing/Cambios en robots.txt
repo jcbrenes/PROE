@@ -1,0 +1,5 @@
+1. Enviar posición de los robots desde la cámara (x,y,cita). Usar RadioHead y desechar todo lo que había de comunicación, solo van a recibir. Solo van a saber su posición actual, todo lo que hay de estimación por estima desaparece ()
+
+2. Los attas hacen random walk, reciben datos pero no lo utilizan.
+
+3.
