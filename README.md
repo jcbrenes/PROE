@@ -1,7 +1,7 @@
 # PROE
 PROYECTO PROE: Implementación de un prototipo de enjambre de robots para la digitalización de escenarios estáticos y planificación de rutas óptimas.
 
-Proyecto de investigación del Instituto Tecnológico de Costa Rica, dirigido por la Escuela de Matemática y con colaboración del Área Académica de Ingeniería Mecatrónica.
+Proyecto de investigación del Instituto Tecnológico de Costa Rica, dirigido por la Escuela de Matemática y con participación de la Escuela de Ingeniería Mecatrónica.
 
 Este proyecto pretende diseñar un sistema multirobot físico para la exploración de escenarios estáticos desconocidos, con el fin de determinar rutas óptimas. Dicha implementación significa una traducción y adaptación de los algoritmos computacionales de exploración investigados en el proyecto “PROE: Simulación computacional para la planificación de rutas óptimas de acceso y/o evacuación por medio de un enjambre centralizado en escenarios estáticos, utilizando técnicas de mapeo, procesamiento de datos y optimización multiobjetivo” (PROE E1F1 ); además de implementar técnicas de recolección, transferencia y procesamiento de datos para mapear la zona y así poder determinar rutas de acceso y/o evacuación seguras.
 
@@ -33,13 +33,6 @@ Directorio de carpetas:
 
 
 Investigadores: 
-- Cindy Calderón Arce ccalderon@itcr.ac.cr (Directora del proyecto)
+- Cindy Calderón Arce ccalderon@itcr.ac.cr 
 - Rebeca Solís Ortega rsolis@itcr.ac.cr
 - Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
-
-Asistentes:
-- Bryan Alpízar Quesada bryan2300@gmail.com
-- Andrés Jiménez Mora andjm1428@gmail.com
-- Célimo Porras Aguilar celimojosepa@estudiantec.cr
-- Isaac Méndez Barquero isaacmn24@estudiantec.cr
-- David Gómez Carrasquilla davidjgomezc@gmail.com
