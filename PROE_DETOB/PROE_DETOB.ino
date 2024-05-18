@@ -54,7 +54,7 @@ int offsetDistanciaInicial = 160; // Se agrega un offset de 16cm para la medici�
 
 //Constantes de configuración//
 const float beta=0.1;  //Constante para el filtro, ajustar para cambiar el comportamiento
-const int servoDelay=5; //Tiempo entre cada paso del servo en milisegundos
+const int servoDelay=3; //Tiempo entre cada paso del servo en milisegundos
 const float distanciaMinimaSharp=140; //Distancia mínima en milimetros para detección de obstáculos
 const int debounceTime=400; //Debounce para sensor IR frontal
 const float maxTemp=40; //Temperatura de detección de fuego
@@ -64,7 +64,7 @@ const int movimientoMaximo=180; //Maxima rotacion en grados realizada por el ser
 int angulo=0;
 int anguloAnterior=0;
 int lectura=0;
-float distancia=0; // Distancia medida por el sharp
+float distancia=5000; // Distancia medida por el sharp, valor inicial grande
 float filtrado=0;
 int cuentaBateria=0;
 int sensorIRdetectado=0;
@@ -78,7 +78,7 @@ unsigned long millisLED=0;
 int c=0; //Pulso de led para ver actividad del STM
 unsigned long lastSend=0; //Almacena cuando se envio el ultimo obstaculo para evitar saturar la comunicación
 const int sendDelay=100; //Tiempo minimo en ms entre cada envio de obstaculo (evita crash del stm)
-char dato[50];
+char dato[10];
 bool nuevoObstaculo = false;
 unsigned long tiempoObstaculo=0; //Guarda en que momento se detecto el ultimo obstaculo
 const int maxTiempoObstaculo=200; //Si no se atiende un obstaculo en 200ms se ignora
@@ -87,6 +87,8 @@ unsigned long lastPoll=0; //Almacena tiempo de ultima lectura de sensores IR
 unsigned long pollingTime=100; //Tiempo minimo entre lectura de sonsores IR
 int lastIR=0; //Ultimo sensor IR que se detecto, evita repetir mensajes
 
+bool pausa = 0; //Sirve para hacer un delay cada vez que el servo del Sharp llegó a 0 o 180°
+const int cambioDireccionDelay = 350; //Delay para que el servo cambie de dirección
 
 void setup() {
   myServo.attach(serv,500,1600); //Une el objeto myServo al pin del servo (serv, min, max) valores en us para mover el servo a su posición minima y máxima (calibración)
@@ -162,7 +164,11 @@ void avizarDistancia(int information){ //Prepara el paquete de datos con la info
 }
 
 void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
-  if((millis() - millisAnterior) > servoDelay) {  //Se utiliza la función millis para evitar usar los delays
+  //Al llegar a 0 o 180°, el servo espera cambioDireccionDelay milisegundos para comenzar a girar al otro lado
+  if((millis() - millisAnterior) > cambioDireccionDelay && pausa == 1) {
+    pausa = 0;
+  }
+  if((millis() - millisAnterior) > servoDelay && pausa == 0) {  //Se utiliza la función millis para evitar usar los delays
     millisAnterior = millis();
     servoPos += incremento;
     myServo.write(servoPos);
@@ -170,6 +176,7 @@ void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
     angulo=-angulo; //Posición de servo invertida en nuevo chasis
     if ((servoPos >= movimientoMaximo) || (servoPos <= 0)){ // se terminó el semiciclo, se invierte la dirección
       incremento = -incremento;
+      pausa = 1;
     }
   }
 }
@@ -302,6 +309,7 @@ void crearMensaje(int caso, int distancia, int angulo){ //Prepara el paquete de 
 void responderFeather(){ 
   if (nuevoObstaculo){ //Evita enviar el mismo obstaculo dos veces
     Wire.write(dato);  //Envia el valor al master
+    memset(dato,0,10); //Resetea el valor almacenado en dato, para evitar que se envie mas
     nuevoObstaculo = false;
     // El feather debe avisar que terminó el proceso de arranque, luego la operación es normal
     if (inicioFeatherListo == 2 && distInicialListo == false){
