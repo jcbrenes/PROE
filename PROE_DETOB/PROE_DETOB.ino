@@ -54,7 +54,7 @@ int offsetDistanciaInicial = 160; // Se agrega un offset de 16cm para la medici�
 
 //Constantes de configuración//
 const float beta=0.1;  //Constante para el filtro, ajustar para cambiar el comportamiento
-const int servoDelay=5; //Tiempo entre cada paso del servo en milisegundos
+const int servoDelay=3; //Tiempo entre cada paso del servo en milisegundos
 const float distanciaMinimaSharp=140; //Distancia mínima en milimetros para detección de obstáculos
 const int debounceTime=400; //Debounce para sensor IR frontal
 const float maxTemp=40; //Temperatura de detección de fuego
@@ -87,6 +87,8 @@ unsigned long lastPoll=0; //Almacena tiempo de ultima lectura de sensores IR
 unsigned long pollingTime=100; //Tiempo minimo entre lectura de sonsores IR
 int lastIR=0; //Ultimo sensor IR que se detecto, evita repetir mensajes
 
+bool pausa = 0; //Sirve para hacer un delay cada vez que el servo del Sharp llegó a 0 o 180°
+const int cambioDireccionDelay = 350; //Delay para que el servo cambie de dirección
 
 void setup() {
   myServo.attach(serv,500,1600); //Une el objeto myServo al pin del servo (serv, min, max) valores en us para mover el servo a su posición minima y máxima (calibración)
@@ -162,7 +164,11 @@ void avizarDistancia(int information){ //Prepara el paquete de datos con la info
 }
 
 void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
-  if((millis() - millisAnterior) > servoDelay) {  //Se utiliza la función millis para evitar usar los delays
+  //Al llegar a 0 o 180°, el servo espera cambioDireccionDelay milisegundos para comenzar a girar al otro lado
+  if((millis() - millisAnterior) > cambioDireccionDelay && pausa == 1) {
+    pausa = 0;
+  }
+  if((millis() - millisAnterior) > servoDelay && pausa == 0) {  //Se utiliza la función millis para evitar usar los delays
     millisAnterior = millis();
     servoPos += incremento;
     myServo.write(servoPos);
@@ -170,6 +176,7 @@ void moverServo(){ //Mueve el servo un valor determinado cada cierto tiempo
     angulo=-angulo; //Posición de servo invertida en nuevo chasis
     if ((servoPos >= movimientoMaximo) || (servoPos <= 0)){ // se terminó el semiciclo, se invierte la dirección
       incremento = -incremento;
+      pausa = 1;
     }
   }
 }
