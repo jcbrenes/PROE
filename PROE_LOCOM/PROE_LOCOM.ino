@@ -1,4 +1,4 @@
-//Código de locomoción y comunicacion para el proyecto PROE
+//Código de locomoción y comunicacion para el proyecto PROE 
 //Usado en la placa Feather M0 RFM95
 //https://github.com/jcbrenes/PROE
 
