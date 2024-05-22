@@ -13,7 +13,7 @@
  *   4)IR izquierdo
  *   5)Temperatura
  *   6)Batería baja
- * Adicionalmente tiene tres salidas conectadas a leds para notificación y un switch extra
+ * Adicionalmente tiene tres salidas conectadas a leds para notificación y un switch extra 
  */
 
 #include <Servo.h>
