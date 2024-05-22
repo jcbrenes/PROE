@@ -1,4 +1,4 @@
-# PROE
+# Repositorio de software para el proyecto PROE
 PROYECTO PROE: Implementación de un prototipo de enjambre de robots para la digitalización de escenarios estáticos y planificación de rutas óptimas.
 
 Proyecto de investigación del Instituto Tecnológico de Costa Rica, dirigido por la Escuela de Matemática y con participación de la Escuela de Ingeniería Mecatrónica.
