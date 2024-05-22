@@ -33,6 +33,6 @@ Directorio de carpetas:
 
 
 Investigadores: 
-- Cindy Calderón Arce ccalderon@itcr.ac.cr 
-- Rebeca Solís Ortega rsolis@itcr.ac.cr
-- Juan Carlos Brenes-Torres juanbrenes@tec.ac.cr
+- Cindy Calderón Arce (ccalderon@itcr.ac.cr). Escuela de Matemática, Tecnológico de Costa Rica. Coordinadora Proyecto  
+- Rebeca Solís Ortega (rsolis@itcr.ac.cr). Escuela de Matemática, Tecnológico de Costa Rica. 
+- Juan Carlos Brenes-Torres (juanbrenes@tec.ac.cr). Escuela de Mecatrónica, Tecnológico de Costa Rica. Encargado del desarrollo de software y hardware para el proyecto. 
