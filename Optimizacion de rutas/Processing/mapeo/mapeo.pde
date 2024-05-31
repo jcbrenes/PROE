@@ -26,7 +26,7 @@ boolean primerClic=true;
 boolean primerClic2=true;
 
 int lastSaveTime = 0;
-int saveInterval = 5000; // Save interval in milliseconds (5 seconds)
+int saveInterval = 10000; // Save interval in milliseconds (5 seconds)
 
 void setup() {
   background(1);
