@@ -121,8 +121,8 @@ void draw() {
   if (millis() - lastSaveTime >= saveInterval) {
     // Save matrices with different names
     String timestamp = nf(hour(), 2) + "-" + nf(minute(), 2) + "-" + nf(second(), 2);
-    guardarMatrizPixeles(colorMatrix, "color_matrix_" + timestamp + ".csv");
-    guardarMatrizDividida(dividedColorMatrix, "divided_color_matrix_" + timestamp + ".csv");
+    guardarMatrizPixeles(colorMatrix, "color_matrix/color_matrix_" + timestamp + ".csv");
+    guardarMatrizDividida(dividedColorMatrix, "divided_color_matrix/divided_color_matrix_" + timestamp + ".csv");
     lastSaveTime = millis(); // Reset last save time
   }
 }

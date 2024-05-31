@@ -19,7 +19,7 @@ file_pattern = r'^divided_color_matrix_\d{2}-\d{2}-\d{2}\.csv$'  # Regex pattern
 #raiz_path = '../Processing/mapeo/'
 
 # Aqui es donde se pone la carpeta específica donde están TODAS las pruebas
-raiz_path = "C:/Users/Isaac/Desktop/Github Repos/PROE/Optimizacion de rutas/Processing/mapeo/"
+raiz_path = "C:/Users/Isaac/Desktop/Github Repos/PROE/Optimizacion de rutas/Processing/mapeo/prueba/"
 DataDang = 'MatrizPeligro.csv'
 
 # Cuantos robots en la prueba
@@ -33,15 +33,22 @@ tiempoPrueba = 5
 prueba = 1
 
 final_path = cantidadRobots_path + str(tiempoPrueba) + "-" + str(prueba)
+divided_matrix_path = final_path + "divided_color_matrix"
+Cob_path = final_path +"/path_objective_Cob.csv"
+
+# Creo carpetas para cada tipo de archivo
+os.mkdir(final_path +"A/")
+os.mkdir(final_path +"D/")
+os.mkdir(final_path +"P/")
+os.mkdir(final_path +"Dict/")
+os.mkdir(final_path +"Graph/")
 
 # Intentamos recuperar todos los archivos de pruebas
 try:
-    sorted_filtered_files = get_filtered_files_sorted_by_modified_time(final_path, file_pattern)
-    
-    archivo_path = final_path +"/path_objective_Cob.csv"
+    sorted_filtered_files = get_filtered_files_sorted_by_modified_time(divided_matrix_path, file_pattern)
     
     # Abro un solo archivo para ir guardando en cada fila el path, objective y Cob
-    with open(archivo_path, 'w', newline='', encoding='utf-8') as csvfile:
+    with open(Cob_path, 'w', newline='', encoding='utf-8') as csvfile:
         writer_path = csv.writer(csvfile)
         
         # Cuarto loop para revisar cada matriz de la prueba

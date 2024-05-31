@@ -247,7 +247,8 @@ def Graph_Opt(adjacency_matrix,Dict,F,C,DataDang,save_graph,FileName='Graph.png'
         plt.savefig(FileName)
     #Muestra la imagen
     if show_graph:
-        plt.show()
+        plt.draw()
+        plt.pause(0.001)
     plt.clf()
     return path_Opt
 
@@ -260,7 +261,7 @@ def Graph_Opt(adjacency_matrix,Dict,F,C,DataDang,save_graph,FileName='Graph.png'
 
 #Carga los archivos producto de la exploración
 #DataFile = 'DataPrueba.csv';
-DataDang = 'MatrizPeligro.csv';
+#DataDang = 'MatrizPeligro.csv';
 #Genera los datos: Matriz de adyacencia, matriz de distancias, matriz de peligrosidad y el diccionario del grafo
 #[A,D,P,Net,F,C,Cob] = GenData_ADPDic(DataFile,DataDang,'A.csv','D.csv','P.csv','Dict.json');
 #Genera el grafo y determina la ruta óptima
