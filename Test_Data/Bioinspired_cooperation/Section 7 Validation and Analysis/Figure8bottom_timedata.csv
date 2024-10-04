@@ -1,0 +1,16 @@
+Exp;Drop_distance;Speed;Coverage_pct;Time
+Exp3;40mm;070mm/s;50,01;895
+Exp3;40mm;120mm/s;50,23;286
+Exp3;40mm;160mm/s;48,82;651,5
+Exp4;40mm;160mm/s;39,26;762
+Exp4;40mm;160mm/s;50,55;92
+Exp3;20mm;070mm/s;50,06;175
+Exp3;20mm;120mm/s;50,06;104
+Exp3;20mm;160mm/s;50,13;156,5
+Exp4;20mm;160mm/s;50,38;250
+Exp4;20mm;160mm/s;50,08;125,5
+Exp3;1mm;070mm/s;50,1;275
+Exp3;1mm;120mm/s;50,36;166,5
+Exp3;1mm;160mm/s;50,77;139,5
+Exp4;1mm;160mm/s;50,82;138,5
+Exp4;1mm;160mm/s;50,42;180
