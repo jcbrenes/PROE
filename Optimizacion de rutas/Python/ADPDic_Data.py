@@ -242,6 +242,7 @@ def Graph_Opt(adjacency_matrix,Dict,F,C,DataDang,save_graph,FileName='Graph.png'
     plt.yticks(np.arange(0,F+0.5,1))
     plt.imshow(Data_P, origin='upper', cmap='jet',alpha=0.4,interpolation='bilinear', vmin=0, vmax=1)
     plt.grid(color = 'gray', linestyle = ':', linewidth = 0.5)
+    plt.tight_layout()
      #Guarda la imagen
     if save_graph:
         plt.savefig(FileName)

@@ -12,7 +12,8 @@ color blanco = color(255,255,255);
 
 // Constants for square size and number of squares
 final int SQUARE_SIZE = 20;
-final int NUM_SQUARES_X = 32;
+final int RECT_WIDTH = 22;
+final int NUM_SQUARES_X = 24;
 final int NUM_SQUARES_Y = 24;
 
 // Variables for divided color matrix
@@ -21,26 +22,26 @@ float[][] dividedColorMatrix;
 float threshold = 30;
 
 boolean[][] colorMatrix; // Boolean matrix to store pixel information
+boolean[][] reducedColorMatrix; // Boolean matrix for the reduced matrix
 
-boolean primerClic=true;
-boolean primerClic2=true;
+boolean primerClic = true;
+boolean primerClic2 = true;
 
 int lastSaveTime = 0;
-int saveInterval = 10000; // Save interval in milliseconds (5 seconds)
+int saveInterval = 10000; // Save interval in milliseconds (10 seconds)
 
 void setup() {
   background(1);
   size(1280, 480);
   String[] cameras = Capture.list();
   printArray(cameras);
-  //video = new Capture(this, "name=GENERAL WEBCAM #2, size=640x480,fps=30");
   video = new Capture(this, cameras[1]);
   video.start();
-  // Start off tracking for red, blue, and green
   trackColor1 = color(255, 0, 0);
   trackColor2 = color(0, 0, 255);
   trackColor3 = color(0, 255, 0);
   colorMatrix = new boolean[video.height][video.width]; // Initialize color matrix
+  reducedColorMatrix = new boolean[video.height][video.width - 112]; // Initialize reduced matrix
   dividedColorMatrix = new float[NUM_SQUARES_Y][NUM_SQUARES_X];
 }
 
@@ -81,39 +82,39 @@ void draw() {
 
       float d3 = dist(r1, g1, b1, r4, g4, b4); // We are using the dist( ) function to compare the current color with the color we are tracking.
       
-      //If current color is similar to tracked color, draw a pixel on the right frame and mark the position as checked
-      if (d1<threshold || d2<threshold || d3<threshold) {
-         if (d1<threshold) {
-           fill(blanco);
-         } else if (d2<threshold) {
-           fill(blanco);
-         } else {
-           fill(blanco);
-         }
-         strokeWeight(0);
-         stroke(1.0);
-         ellipse(x+video.width, y, 1, 1); 
-         colorMatrix[y][x] = true; // Set the corresponding pixel in the matrix to true
+      // If current color is similar to tracked color, draw a pixel on the right frame and mark the position as checked
+      if (d1 < threshold || d2 < threshold || d3 < threshold) {
+        fill(blanco);
+        strokeWeight(0);
+        stroke(1.0);
+        ellipse(x + video.width, y, 1, 1); 
+        colorMatrix[y][x] = true; // Set the corresponding pixel in the matrix to true
       }
     }
   }
   
-  // Recorro cada celda de la matriz dividida
-  for (int filaDividida = 0; filaDividida < NUM_SQUARES_X-1; filaDividida++) {
-    for (int columnaDividida = 0; columnaDividida < NUM_SQUARES_Y-1; columnaDividida++) {  
+  // Populate reducedColorMatrix
+  for (int y = 0; y < video.height; y++) {
+    for (int x = 16; x < video.width - 96; x++) {
+      reducedColorMatrix[y][x - 16] = colorMatrix[y][x];
+    }
+  }
+
+  // Iterate over each cell of the divided matrix
+  for (int filaDividida = 0; filaDividida < NUM_SQUARES_Y; filaDividida++) {
+    for (int columnaDividida = 0; columnaDividida < NUM_SQUARES_X; columnaDividida++) {  
       float promedioUnos = 0;
       int sumatoriaUnos = 0;
-      // Recorro cada pixel dentro de la celda
-      for (int filaPixeles = filaDividida*SQUARE_SIZE; filaPixeles < filaDividida*SQUARE_SIZE + SQUARE_SIZE-1; filaPixeles++){
-        for (int columnaPixeles = columnaDividida*SQUARE_SIZE; columnaPixeles < columnaDividida*SQUARE_SIZE + SQUARE_SIZE-1; columnaPixeles++){
-          //guardarMatrizPixeles(colorMatrix, "divided_color_matrix_" + columnaDividida + ".csv");
-          if (colorMatrix[columnaPixeles][filaPixeles]) {
+      // Iterate over each pixel within the cell
+      for (int filaPixeles = filaDividida * SQUARE_SIZE; filaPixeles < (filaDividida + 1) * SQUARE_SIZE; filaPixeles++) {
+        for (int columnaPixeles = columnaDividida * RECT_WIDTH; columnaPixeles < (columnaDividida + 1) * RECT_WIDTH; columnaPixeles++) {
+          if (filaPixeles < video.height && columnaPixeles < video.width - 112 && reducedColorMatrix[filaPixeles][columnaPixeles]) {
             sumatoriaUnos++;
           }
         }
       }
-    promedioUnos = (float)sumatoriaUnos/(SQUARE_SIZE*SQUARE_SIZE);
-    dividedColorMatrix[columnaDividida][filaDividida] = promedioUnos;
+      promedioUnos = (float) sumatoriaUnos / (SQUARE_SIZE * RECT_WIDTH);
+      dividedColorMatrix[filaDividida][columnaDividida] = promedioUnos;
     }
   }
   
@@ -121,8 +122,8 @@ void draw() {
   if (millis() - lastSaveTime >= saveInterval) {
     // Save matrices with different names
     String timestamp = nf(hour(), 2) + "-" + nf(minute(), 2) + "-" + nf(second(), 2);
-    guardarMatrizPixeles(colorMatrix, "color_matrix/color_matrix_" + timestamp + ".csv");
-    guardarMatrizDividida(dividedColorMatrix, "divided_color_matrix/divided_color_matrix_" + timestamp + ".csv");
+    guardarMatrizPixeles(reducedColorMatrix, "prueba/reduced_color_matrix/reduced_color_matrix_" + timestamp + ".csv");
+    guardarMatrizDividida(dividedColorMatrix, "prueba/divided_color_matrix/divided_color_matrix_" + timestamp + ".csv");
     lastSaveTime = millis(); // Reset last save time
   }
 }
@@ -145,7 +146,7 @@ void mousePressed() {
 
 void keyPressed() {
   if (key == 's' || key == 'S') { // Press 's' or 'S' to save the matrix
-    guardarMatrizPixeles(colorMatrix, "color_matrix.csv");
+    guardarMatrizPixeles(reducedColorMatrix, "color_matrix.csv");
     println("Color matrix saved as color_matrix.csv");
   }
 }
